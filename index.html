@@ -3,74 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Geo-co0ode | 018810</title>
+    <title>Sovereign O0 Protocol | 018810</title>
     <style>
-        :root { --bg: #050505; --grid: #1a1a1a; --active: #00f2ff; --pivot: #ff0055; }
-        body { background: var(--bg); color: #fff; font-family: monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        header { padding: 10px; text-align: center; border-bottom: 1px solid #333; font-size: 14px; letter-spacing: 2px; }
-        #matrix { flex: 1; display: grid; grid-template-columns: repeat(24, 1fr); gap: 1px; background: var(--grid); width: 100vw; }
-        .tile { background: var(--bg); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #333; }
-        .tile.active { background: var(--active); box-shadow: 0 0 5px var(--active); color: #000; }
-        .tile.pivot { border: 1px solid var(--pivot); color: var(--pivot); }
-        footer { padding: 20px; background: #111; display: flex; justify-content: space-around; border-top: 1px solid #333; }
-        button { background: #222; color: var(--active); border: 1px solid var(--active); padding: 12px; border-radius: 4px; font-weight: bold; }
+        body { margin: 0; background: #050505; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
+        #ui-layer { position: absolute; top: 10px; left: 10px; z-index: 10; pointer-events: none; }
+        .stat-box { background: rgba(0, 20, 0, 0.8); border: 1px solid #00ff41; padding: 10px; margin-bottom: 5px; pointer-events: auto; font-size: 12px; }
+        #log { height: 100px; overflow-y: auto; width: 300px; white-space: pre-wrap; }
+        .controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 10px; }
+        button { background: #004400; color: #00ff41; border: 1px solid #00ff41; padding: 10px 20px; cursor: pointer; }
+        button:hover { background: #00ff41; color: #000; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
 
-<header>GEO-CO0ODE | 018810 ENGINE</header>
+<div id="ui-layer">
+    <div class="stat-box">
+        <strong>SYSTEM: 018810_MIRROR_CORE</strong><br>
+        COMPRESSION: 3000:1 LOCKED<br>
+        STATUS: EM_INDUCTION_ACTIVE
+    </div>
+    <div id="log" class="stat-box">>> Initializing Geometric Engine...</div>
+</div>
 
-<div id="matrix"></div>
-
-<footer>
-    <button id="save-btn">MIRROR SAVE</button>
-    <button id="print-btn">MIRROR PRINT</button>
-</footer>
+<div class="controls">
+    <input type="file" id="fileInput" style="display:none">
+    <button onclick="document.getElementById('fileInput').click()">INJECT DATA</button>
+    <button id="toggleMic">EM SENSOR</button>
+</div>
 
 <script type="module">
-    // This connects to the modular engine you already built
-    import Orchestrator from './engine/orchestrator.js';
+    import * as THREE from 'https://esm.sh/three@0.177.0';
 
-    const matrix = document.getElementById('matrix');
-    const TOTAL_TILES = 960;
+    // --- Core Configuration ---
+    const GRID_SIZE = 960; // 32x30 Grid
+    const ROWS = 32;
+    const COLS = 30;
+    
+    let scene, camera, renderer, gridMesh, dummy;
+    let geoGrid = [];
+    let audioContext, analyser, dataArray, source;
+    let isMicActive = false;
 
-    // Initialize the UI Grid
-    function drawGrid() {
-        matrix.innerHTML = '';
-        for (let i = 0; i < TOTAL_TILES; i++) {
-            const tile = document.createElement('div');
-            tile.className = 'tile';
-            tile.id = `tile-${i}`;
-            if (i === 88 || i % 100 === 88) {
-                tile.classList.add('pivot');
-                tile.innerText = '88';
-            }
-            tile.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                toggleTile(i);
-            });
-            matrix.appendChild(tile);
+    const log = (msg) => {
+        const el = document.getElementById('log');
+        el.innerText += `\n> ${msg}`;
+        el.scrollTop = el.scrollHeight;
+    };
+
+    // --- Initialization ---
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020202);
+        scene.fog = new THREE.FogExp2(0x020202, 0.05);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(15, 15, 40);
+        camera.lookAt(15, 15, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Instanced Mesh for High-Density Rendering
+        const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.2);
+        const material = new THREE.MeshPhongMaterial({ color: 0x00ff41, transparent: true, opacity: 0.8 });
+        gridMesh = new THREE.InstancedMesh(geometry, material, GRID_SIZE);
+        dummy = new THREE.Object3D();
+
+        // Build Initial Geometric State
+        for (let i = 0; i < GRID_SIZE; i++) {
+            const x = i % COLS;
+            const y = Math.floor(i / COLS);
+            geoGrid.push({ id: i, value: 0, x, y, emWeight: 0 });
+            
+            dummy.position.set(x, y, 0);
+            dummy.updateMatrix();
+            gridMesh.setMatrixAt(i, dummy.matrix);
+        }
+        
+        scene.add(gridMesh);
+        scene.add(new THREE.AmbientLight(0x404040));
+        const pointLight = new THREE.PointLight(0x00ff41, 2, 100);
+        pointLight.position.set(15, 15, 20);
+        scene.add(pointLight);
+
+        animate();
+        log("Geometric DNA Map Loaded.");
+    }
+
+    // --- 018810 Mirror Logic & Compression Injection ---
+    function processData(buffer) {
+        const bytes = new Uint8Array(buffer);
+        log(`Processing ${bytes.length} bytes @ 3000:1 ratio...`);
+
+        for (let i = 0; i < GRID_SIZE; i++) {
+            // Sultan 47 Byte-by-Byte Mapping
+            const byte = bytes[i % bytes.length];
+            const weight = byte / 255;
+            
+            // Mirror Code Application: 0 is null, 1 is active, 8 is reflected
+            let val = 0;
+            if (weight > 0.8) val = 8;
+            else if (weight > 0.1) val = 1;
+
+            geoGrid[i].value = val;
+            geoGrid[i].emWeight = weight;
         }
     }
 
-    function toggleTile(index) {
-        const tile = document.getElementById(`tile-${index}`);
-        tile.classList.toggle('active');
+    // --- EM Induction (Audio/Frequency) ---
+    async function initAudio() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
         
-        // 018810 Mirror Logic: Find the reflection
-        const mirrorIndex = (TOTAL_TILES - 1) - index;
-        const mirrorTile = document.getElementById(`tile-${mirrorIndex}`);
-        if (mirrorTile) mirrorTile.classList.toggle('active');
+        if (!isMicActive) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            isMicActive = true;
+            log("EM Sensor Online: Listening for current...");
+        }
     }
 
-    // Start the engine logic from your /engine folder
-    window.addEventListener('load', () => {
-        drawGrid();
-        Orchestrator.init();
+    // --- Animation Loop ---
+    function animate() {
+        requestAnimationFrame(animate);
+
+        let pushPull = 0;
+        if (isMicActive) {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for(let i=0; i<10; i++) sum += dataArray[i];
+            pushPull = sum / 2550; // Current EM intensity
+        }
+
+        for (let i = 0; i < GRID_SIZE; i++) {
+            const node = geoGrid[i];
+            const x = i % COLS;
+            const y = Math.floor(i / COLS);
+
+            // geometric displacement based on 018810 values
+            let z = node.value === 8 ? 2 : (node.value === 1 ? 0.5 : 0);
+            
+            // Add EM Induction jitter (Push/Pull)
+            if (node.value > 0) {
+                z += Math.sin(Date.now() * 0.005 + i) * pushPull;
+            }
+
+            dummy.position.set(x, y, z);
+            
+            // Mirror reflection rotation
+            if (node.value === 8) {
+                dummy.rotation.y = Math.PI; // Flipped
+                dummy.scale.set(1.2, 1.2, 1);
+            } else {
+                dummy.rotation.y = 0;
+                dummy.scale.set(1, 1, 1);
+            }
+
+            dummy.updateMatrix();
+            gridMesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        gridMesh.instanceMatrix.needsUpdate = true;
+        renderer.render(scene, camera);
+    }
+
+    // --- Event Listeners ---
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (ev) => processData(ev.target.result);
+        reader.readAsArrayBuffer(file);
     });
 
-    document.getElementById('save-btn').addEventListener('click', () => Orchestrator.save());
-</script>
+    document.getElementById('toggleMic').addEventListener('click', initAudio);
 
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    init();
+</script>
 </body>
 </html>
