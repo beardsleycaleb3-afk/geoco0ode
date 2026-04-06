@@ -8,7 +8,7 @@ const Clock = {
     ticks: 0,
 
     start: function(callback) {
-        const ms = (60 / this.bpm) * 1000 / 4; // 16th notes for high-density tracking
+        const ms = (60 / this.bpm) * 1000 / 4; // 16th notes
         this.interval = setInterval(() => {
             this.ticks++;
             callback(this.ticks);
@@ -21,5 +21,4 @@ const Clock = {
         this.ticks = 0;
     }
 };
-
 export default Clock;
