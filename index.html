@@ -5,246 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GEO-CO0ODE | 018810</title>
     <style>
-        body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
+        body { margin: 0; background: #000; color: #00ff41; font-family: monospace; overflow: hidden; }
         canvas { display: block; image-rendering: pixelated; width: 100vw; height: 100vh; }
-        #interface { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .hud { position: absolute; top: 20px; left: 20px; background: rgba(0, 5, 0, 0.9); border: 1px solid #00ff41; padding: 15px; width: 280px; pointer-events: auto; }
-        .system-status { font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid #00ff41; padding-bottom: 5px; }
-        .terminal { height: 100px; font-size: 10px; overflow-y: hidden; color: #008f11; display: flex; flex-direction: column-reverse; }
-        .actions { margin-top: 15px; display: flex; gap: 8px; }
-        button { background: #000; color: #00ff41; border: 1px solid #00ff41; padding: 10px; cursor: pointer; flex: 1; font-size: 10px; font-family: inherit; }
-        button:active { background: #00ff41; color: #000; }
+        .hud { position: absolute; top: 15px; left: 15px; border: 1px solid #00ff41; background: rgba(0,0,0,0.9); padding: 12px; pointer-events: none; width: 250px; }
     </style>
 </head>
 <body>
-
-<div id="interface">
     <div class="hud">
-        <div class="system-status">
-            018810 MIRROR ENGINE [v3.3]<br>
-            GRID: 30x32 (960 NODES)<br>
-            EM_LINK: <span id="em-state">STABLE</span>
-        </div>
-        <div id="log-stream" class="terminal"></div>
-        <div class="actions">
-            <button id="btn-inject">INJECT_DATA</button>
-            <button id="btn-em">EM_SENSOR</button>
-        </div>
+        SYSTEM: 018810_MIRROR_CORE<br>
+        INPUT: 8-BIT HEX STRANDS<br>
+        STATUS: <span id="status">IDLE</span>
     </div>
-</div>
-
-<canvas id="engine-surface"></canvas>
-<input type="file" id="file-input" style="display:none">
+    <canvas id="canvas"></canvas>
 
 <script type="module">
-    // --- DIRECT SUBFOLDER LINKAGE ---
-    import Translator from './engine/translator.js';   // Fold logic (959 - i)
-    import Orchestrator from './engine/orchestrator.js'; // 960 Grid Control
-    import Telemetry from './engine/telemetry.js';     // Log redirection
+    import Orchestrator, { Audio, Acceptor, Storage } from './engine/engine.js';
 
-    const canvas = document.getElementById('engine-surface');
+    const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { alpha: false });
-    const logBox = document.getElementById('log-stream');
-    
-    let audioCtx, analyser, dataArray;
-    let pushPullFactor = 0;
+    let emIntensity = 0;
 
-    function log(msg) {
-        const entry = document.createElement('div');
-        entry.textContent = `> ${msg}`;
-        logBox.prepend(entry);
-    }
+    window.addEventListener('geo-sync', (e) => {
+        emIntensity = e.detail;
+        document.getElementById('status').textContent = emIntensity > 5 ? 'EM_ACTIVE' : 'STABLE';
+    });
 
-    // Connect engine telemetry to the UI log
-    if (Telemetry && Telemetry.logger) {
-        Telemetry.logger.onLog = (msg) => log(msg);
-    }
-
-    function init() {
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        });
-        window.dispatchEvent(new Event('resize'));
-
-        // Initialize your engine's logic
+    async function boot() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        await Audio.init();
         Orchestrator.init();
-        log("Geometric DNA Map Loaded.");
-        render();
+
+        window.addEventListener('keydown', (e) => {
+            Acceptor.process(e.key, (strand) => Orchestrator.typewrite(strand));
+        });
+
+        draw();
     }
 
-    async function toggleEM() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioCtx.createAnalyser();
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioCtx.createMediaStreamSource(stream).connect(analyser);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            document.getElementById('em-state').textContent = 'ACTIVE';
-            log("EM Sensor: Synchronizing with current...");
-        }
-    }
-
-    function render() {
+    function draw() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const cols = 30;
-        const rows = 32;
-        const cellW = canvas.width / cols;
-        const cellH = canvas.height / rows;
+        const cw = canvas.width / 30, ch = canvas.height / 32;
+        const jitter = emIntensity * 0.15;
 
-        if (audioCtx) {
-            analyser.getByteFrequencyData(dataArray);
-            // Average high frequencies for induction jitter
-            pushPullFactor = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        }
+        Orchestrator.nodes.forEach((n, i) => {
+            if (n.value > 0 || n.isPivot) {
+                const x = (i % 30) * cw, y = Math.floor(i / 30) * ch;
+                
+                // Color mapping: Pivot Red, Data Cyan
+                ctx.fillStyle = n.isPivot ? '#ff0041' : `rgba(0, 240, 255, ${n.value/255})`;
+                ctx.fillRect(x + (Math.random() * jitter), y, cw - 1, ch - 1);
 
-        Orchestrator.nodes.forEach((node, i) => {
-            if (node.value > 0 || node.isPivot) {
-                const x = (i % cols) * cellW;
-                const y = Math.floor(i / cols) * cellH;
-
-                // 018810 Mirror via Translator.js fold (959 - i)
-                const mirrorIdx = Translator.fold(i, 960);
-                const mx = (mirrorIdx % cols) * cellW;
-                const my = Math.floor(mirrorIdx / cols) * cellH;
-
-                const jitter = (Math.random() * pushPullFactor * 0.15);
-
-                // Pivot Check (Red hinge from your screenshots)
-                if (node.isPivot || i === 88 || i % 100 === 88) {
-                    ctx.fillStyle = '#ff0041';
-                    ctx.fillRect(x + jitter, y + jitter, cellW - 1, cellH - 1);
-                } else {
-                    ctx.fillStyle = `rgba(0, 255, 65, ${node.value / 255})`;
-                    ctx.fillRect(x + jitter, y + jitter, cellW - 1, cellH - 1);
-                    
-                    // Render the geometric reflection
-                    ctx.strokeStyle = `rgba(0, 180, 255, 0.3)`;
-                    ctx.strokeRect(mx - jitter, my - jitter, cellW - 1, cellH - 1);
+                // Highlight Typewriter Head
+                if (i === Orchestrator.cursor) {
+                    ctx.strokeStyle = '#fff';
+                    ctx.strokeRect(x, y, cw - 1, ch - 1);
                 }
             }
         });
-
-        requestAnimationFrame(render);
+        requestAnimationFrame(draw);
     }
 
-    // Interaction bindings
-    document.getElementById('btn-inject').onclick = () => document.getElementById('file-input').click();
-    document.getElementById('btn-em').onclick = toggleEM;
-    document.getElementById('file-input').onchange = (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const bytes = new Uint8Array(ev.target.result);
-            log(`3000:1 Injection: ${file.name}`);
-            Orchestrator.nodes.forEach((node, i) => {
-                node.value = bytes[i % bytes.length];
-            });
-        };
-        reader.readAsArrayBuffer(file);
-    };
-
-    init();
-</script>
-</body>
-</html>
-
-        for (let i = 0; i < GRID_SIZE; i++) {
-            // Sultan 47 Byte-by-Byte Mapping
-            const byte = bytes[i % bytes.length];
-            const weight = byte / 255;
-            
-            // Mirror Code Application: 0 is null, 1 is active, 8 is reflected
-            let val = 0;
-            if (weight > 0.8) val = 8;
-            else if (weight > 0.1) val = 1;
-
-            geoGrid[i].value = val;
-            geoGrid[i].emWeight = weight;
-        }
-    }
-
-    // --- EM Induction (Audio/Frequency) ---
-    async function initAudio() {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-        }
-        
-        if (!isMicActive) {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-            isMicActive = true;
-            log("EM Sensor Online: Listening for current...");
-        }
-    }
-
-    // --- Animation Loop ---
-    function animate() {
-        requestAnimationFrame(animate);
-
-        let pushPull = 0;
-        if (isMicActive) {
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for(let i=0; i<10; i++) sum += dataArray[i];
-            pushPull = sum / 2550; // Current EM intensity
-        }
-
-        for (let i = 0; i < GRID_SIZE; i++) {
-            const node = geoGrid[i];
-            const x = i % COLS;
-            const y = Math.floor(i / COLS);
-
-            // geometric displacement based on 018810 values
-            let z = node.value === 8 ? 2 : (node.value === 1 ? 0.5 : 0);
-            
-            // Add EM Induction jitter (Push/Pull)
-            if (node.value > 0) {
-                z += Math.sin(Date.now() * 0.005 + i) * pushPull;
-            }
-
-            dummy.position.set(x, y, z);
-            
-            // Mirror reflection rotation
-            if (node.value === 8) {
-                dummy.rotation.y = Math.PI; // Flipped
-                dummy.scale.set(1.2, 1.2, 1);
-            } else {
-                dummy.rotation.y = 0;
-                dummy.scale.set(1, 1, 1);
-            }
-
-            dummy.updateMatrix();
-            gridMesh.setMatrixAt(i, dummy.matrix);
-        }
-
-        gridMesh.instanceMatrix.needsUpdate = true;
-        renderer.render(scene, camera);
-    }
-
-    // --- Event Listeners ---
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (ev) => processData(ev.target.result);
-        reader.readAsArrayBuffer(file);
-    });
-
-    document.getElementById('toggleMic').addEventListener('click', initAudio);
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    init();
+    boot();
 </script>
 </body>
 </html>
