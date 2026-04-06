@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GEO-CO0ODE • Sphere v10.0</title>
+    <title>GEO-CO0ODE • Sphere v10.1</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap');
         :root {
@@ -12,74 +12,59 @@
         }
         body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'IBM Plex Mono', monospace; }
         #appRoot { display: flex; width: 100vw; height: 100vh; flex-direction: column; }
-        
-        /* Layout Components */
-        #headerEl { height: 50px; background: var(--panel-bg); border-bottom: 2px solid var(--neon-yellow); display: flex; align-items: center; padding: 0 15px; justify-content: space-between; color: var(--text-on-light); font-weight: bold; }
-        #canvasCtn { flex-grow: 1; position: relative; background: radial-gradient(circle, #080f08 0%, #000 100%); }
-        #bottomPanel { height: 200px; background: var(--panel-bg); border-top: 2px solid var(--neon-yellow); display: flex; flex-direction: column; }
-        
-        /* UI Elements */
-        .toolbar { height: 70px; display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(0,0,0,0.05); }
-        .square-btn { width: 50px; height: 50px; border-radius: 12px; border: 2px solid var(--neon-yellow); background: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        #logPanel { flex: 1; overflow-y: auto; padding: 10px; background: #cfcfcf; font-size: 11px; color: #333; border-top: 1px solid var(--neon-yellow); }
-        .log-entry { border-bottom: 1px solid #bbb; padding: 2px 0; }
-        .nav-btn { background: none; border: 1px solid var(--neon-yellow); padding: 5px 10px; font-family: inherit; font-size: 11px; cursor: pointer; }
+        #headerEl { height: 50px; background: var(--panel-bg); border-bottom: 2px solid var(--neon-yellow); display: flex; align-items: center; padding: 0 15px; justify-content: space-between; color: var(--text-on-light); font-weight: bold; z-index: 10; }
+        #canvasCtn { flex-grow: 1; position: relative; background: #000; }
+        #bottomPanel { height: 200px; background: var(--panel-bg); border-top: 2px solid var(--neon-yellow); display: flex; flex-direction: column; z-index: 10; }
+        .toolbar { height: 70px; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(0,0,0,0.1); }
+        .square-btn { width: 55px; height: 55px; border-radius: 10px; border: 2px solid var(--neon-yellow); background: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 0 #888; }
+        .square-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #666; }
+        #logPanel { flex: 1; overflow-y: auto; padding: 10px; background: #cfcfcf; font-size: 11px; color: #111; border-top: 1px solid var(--neon-yellow); line-height: 1.4; }
+        .log-entry { border-bottom: 1px solid #bbb; padding: 2px 0; font-family: monospace; }
     </style>
 </head>
 <body>
 
 <div id="appRoot">
     <header id="headerEl">
-        <div>018810 // SOVEREIGN PROTOCOL</div>
-        <div style="display:flex; gap:10px;">
-            <button class="nav-btn" onclick="location.reload()">REBOOT</button>
-            <button id="saveBtn" class="nav-btn">💾 SAVE</button>
-        </div>
+        <div>018810 // SOVEREIGN O0</div>
+        <div style="font-size: 10px;">COMPRESSION 3000:1</div>
     </header>
 
-    <div id="canvasCtn">
-        <div style="position:absolute; top:15px; right:15px; background:rgba(0,0,0,0.7); padding:10px; border:1px solid var(--neon-yellow); color:#fff; font-size:10px; pointer-events:none;">
-            TELEMETRY: <span id="status">LOCKED</span><br>
-            HITS: <span id="hits">0</span><br>
-            RATIO: 3000:1 [GEO-DNA]
-        </div>
-    </div>
+    <div id="canvasCtn"></div>
 
     <div id="bottomPanel">
         <div class="toolbar">
-            <button id="bPulse" class="square-btn">⚡</button>
-            <button id="bMic" class="square-btn">🎤</button>
-            <button id="bLoad" class="square-btn">📂</button>
-            <button id="bClear" class="square-btn">🔄</button>
+            <button id="bPulse" class="square-btn" title="Pulse Mirror">⚡</button>
+            <button id="bLoad" class="square-btn" title="Load MP3">📂</button>
+            <button id="bClear" class="square-btn" title="Reset Grid">🔄</button>
         </div>
-        <div id="logPanel"></div>
+        <div id="logPanel">
+            <div class="log-entry">> SYSTEM READY: V10.1</div>
+            <div class="log-entry">> WAITING FOR MP3 INJECTION...</div>
+        </div>
     </div>
 </div>
 
-<input type="file" id="audioInput" accept="audio/*" style="display:none">
+<input type="file" id="audioInput" accept="audio/mp3" style="display:none">
 
 <script type="module">
     import * as THREE from 'https://esm.sh/three@0.177.0';
 
-    // --- ENGINE CONSTANTS ---
     const TOTAL_BACKDROP = 960;
     const TOTAL_SPHERE = 200;
     const MIRROR_FOLD = (i) => 959 - i;
     
-    let scene, camera, renderer, clock;
-    let backMesh, sphereMesh, coreMesh;
+    let scene, camera, renderer, backMesh, sphereMesh, coreMesh;
     let audioCtx, analyser, dataArray;
-    let hits = 0;
 
-    const log = (msg) => {
+    function log(msg) {
         const p = document.getElementById('logPanel');
         const d = document.createElement('div');
         d.className = 'log-entry';
-        d.textContent = `> ${msg}`;
+        d.textContent = `> ${new Date().toLocaleTimeString()}: ${msg}`;
         p.prepend(d);
-    };
+    }
 
-    // --- INITIALIZATION ---
     function init() {
         const container = document.getElementById('canvasCtn');
         scene = new THREE.Scene();
@@ -90,22 +75,22 @@
         renderer.setSize(container.clientWidth, container.clientHeight);
         container.appendChild(renderer.domElement);
 
-        // 1. BACKDROP GRID (960 Tiles)
-        const backGeo = new THREE.BoxGeometry(1.5, 1.5, 0.2);
+        // 1. BACKDROP (960 Tiles)
+        const backGeo = new THREE.BoxGeometry(1.4, 1.4, 0.2);
         const backMat = new THREE.MeshPhongMaterial({ color: 0xffffff, vertexColors: true });
         backMesh = new THREE.InstancedMesh(backGeo, backMat, TOTAL_BACKDROP);
         
         const dummy = new THREE.Object3D();
         for(let i=0; i<TOTAL_BACKDROP; i++) {
-            dummy.position.set((i % 30) * 1.8 - 27, Math.floor(i / 30) * 1.8 - 28, -15);
+            dummy.position.set((i % 30) * 1.6 - 23, Math.floor(i / 30) * 1.6 - 25, -15);
             dummy.updateMatrix();
             backMesh.setMatrixAt(i, dummy.matrix);
             backMesh.setColorAt(i, new THREE.Color(0x0a1a10));
         }
         scene.add(backMesh);
 
-        // 2. SPHERE NODES (200)
-        const sphGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+        // 2. SPHERE (200 Nodes)
+        const sphGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
         sphereMesh = new THREE.InstancedMesh(sphGeo, backMat, TOTAL_SPHERE);
         const phi = Math.PI * (3 - Math.sqrt(5));
         for(let i=0; i<TOTAL_SPHERE; i++) {
@@ -121,62 +106,146 @@
         }
         scene.add(sphereMesh);
 
-        // 3. CORE
-        coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(5, 1), new THREE.MeshBasicMaterial({color: 0x333333, wireframe: true}));
+        // 3. WIREFRAME CORE
+        coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(5, 1), new THREE.MeshBasicMaterial({color: 0x444444, wireframe: true}));
         scene.add(coreMesh);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-        const pL = new THREE.PointLight(0x00ffcc, 2); pL.position.set(0,0,20); scene.add(pL);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const light = new THREE.PointLight(0xffff00, 2); light.position.set(0,10,20); scene.add(light);
 
-        log("Sultan 47 Demodulator Online.");
         animate();
     }
 
-    // --- AUDIO HANDLING ---
-    async function setupAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-    }
-
-    document.getElementById('bLoad').onclick = () => document.getElementById('audioInput').click();
-    document.getElementById('audioInput').onchange = async (e) => {
-        await setupAudio();
-        const file = e.target.files[0];
-        const buffer = await audioCtx.decodeAudioData(await file.arrayBuffer());
-        const raw = buffer.getChannelData(0);
-        
-        // 018810 Mirror Injection
-        for(let i=0; i<480; i++) {
-            const val = Math.abs(raw[Math.floor(i * (raw.length/480))] * 255);
-            const color = new THREE.Color(`rgb(0, ${val}, ${val/2})`);
-            backMesh.setColorAt(i, color);
-            backMesh.setColorAt(MIRROR_FOLD(i), color);
+    async function processAudio(file) {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
         }
+        
+        log(`DECODING DNA: ${file.name}...`);
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const raw = audioBuffer.getChannelData(0);
+        
+        // 018810 Demodulation Logic
+        const step = Math.floor(raw.length / 480);
+        for(let i=0; i<480; i++) {
+            const amp = Math.abs(raw[i * step]);
+            const col = new THREE.Color().setHSL(0.5 + (amp * 0.5), 1.0, 0.5);
+            
+            // Map to Backdrop Tiles with Mirror
+            backMesh.setColorAt(i, col);
+            backMesh.setColorAt(MIRROR_FOLD(i), col);
+            
+            // Map to Sphere Nodes
+            if (i < 200) sphereMesh.setColorAt(i, col);
+        }
+        
         backMesh.instanceColor.needsUpdate = true;
-        log(`Injected Strand: ${file.name}`);
-    };
+        sphereMesh.instanceColor.needsUpdate = true;
+        log("GEOMETRIC RECONSTRUCTION COMPLETE.");
+    }
 
     function animate() {
         requestAnimationFrame(animate);
-        if (analyser) {
-            analyser.getByteFrequencyData(dataArray);
-            const bass = dataArray[2] / 255;
-            coreMesh.scale.set(1 + bass, 1 + bass, 1 + bass);
-            coreMesh.rotation.y += 0.01;
-        }
+        coreMesh.rotation.y += 0.005;
         renderer.render(scene, camera);
     }
 
-    document.getElementById('bClear').onclick = () => {
-        for(let i=0; i<TOTAL_BACKDROP; i++) backMesh.setColorAt(i, new THREE.Color(0x0a1a10));
-        backMesh.instanceColor.needsUpdate = true;
-        log("Memory Cleared.");
+    // --- BINDINGS ---
+    document.getElementById('bLoad').onclick = () => document.getElementById('audioInput').click();
+    document.getElementById('audioInput').onchange = (e) => {
+        if (e.target.files[0]) processAudio(e.target.files[0]);
     };
 
-    window.onload = init;
+    document.getElementById('bPulse').onclick = () => {
+        coreMesh.scale.set(1.5, 1.5, 1.5);
+        setTimeout(() => coreMesh.scale.set(1, 1, 1), 100);
+        log("PULSE EMITTED.");
+    };
+
+    document.getElementById('bClear').onclick = () => {
+        const off = new THREE.Color(0x0a1a10);
+        for(let i=0; i<TOTAL_BACKDROP; i++) backMesh.setColorAt(i, off);
+        for(let i=0; i<TOTAL_SPHERE; i++) sphereMesh.setColorAt(i, new THREE.Color(0x222222));
+        backMesh.instanceColor.needsUpdate = true;
+        sphereMesh.instanceColor.needsUpdate = true;
+        log("GRID RESET.");
+    };
+
+    window.addEventListener('resize', () => {
+        const container = document.getElementById('canvasCtn');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    init();
+</script>
+</body>
+</html>
+        }
+        
+        log(`DECODING DNA: ${file.name}...`);
+        const arrayBuffer = await file.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const raw = audioBuffer.getChannelData(0);
+        
+        // 018810 Demodulation Logic
+        const step = Math.floor(raw.length / 480);
+        for(let i=0; i<480; i++) {
+            const amp = Math.abs(raw[i * step]);
+            const col = new THREE.Color().setHSL(0.5 + (amp * 0.5), 1.0, 0.5);
+            
+            // Map to Backdrop Tiles with Mirror
+            backMesh.setColorAt(i, col);
+            backMesh.setColorAt(MIRROR_FOLD(i), col);
+            
+            // Map to Sphere Nodes
+            if (i < 200) sphereMesh.setColorAt(i, col);
+        }
+        
+        backMesh.instanceColor.needsUpdate = true;
+        sphereMesh.instanceColor.needsUpdate = true;
+        log("GEOMETRIC RECONSTRUCTION COMPLETE.");
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        coreMesh.rotation.y += 0.005;
+        renderer.render(scene, camera);
+    }
+
+    // --- BINDINGS ---
+    document.getElementById('bLoad').onclick = () => document.getElementById('audioInput').click();
+    document.getElementById('audioInput').onchange = (e) => {
+        if (e.target.files[0]) processAudio(e.target.files[0]);
+    };
+
+    document.getElementById('bPulse').onclick = () => {
+        coreMesh.scale.set(1.5, 1.5, 1.5);
+        setTimeout(() => coreMesh.scale.set(1, 1, 1), 100);
+        log("PULSE EMITTED.");
+    };
+
+    document.getElementById('bClear').onclick = () => {
+        const off = new THREE.Color(0x0a1a10);
+        for(let i=0; i<TOTAL_BACKDROP; i++) backMesh.setColorAt(i, off);
+        for(let i=0; i<TOTAL_SPHERE; i++) sphereMesh.setColorAt(i, new THREE.Color(0x222222));
+        backMesh.instanceColor.needsUpdate = true;
+        sphereMesh.instanceColor.needsUpdate = true;
+        log("GRID RESET.");
+    };
+
+    window.addEventListener('resize', () => {
+        const container = document.getElementById('canvasCtn');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    init();
 </script>
 </body>
 </html>
