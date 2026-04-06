@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Geo-co0ode | 018810</title>
+    <style>
+        :root { --bg: #050505; --grid: #1a1a1a; --active: #00f2ff; --pivot: #ff0055; }
+        body { background: var(--bg); color: #fff; font-family: monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        header { padding: 10px; text-align: center; border-bottom: 1px solid #333; font-size: 14px; letter-spacing: 2px; }
+        #matrix { flex: 1; display: grid; grid-template-columns: repeat(24, 1fr); gap: 1px; background: var(--grid); width: 100vw; }
+        .tile { background: var(--bg); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #333; }
+        .tile.active { background: var(--active); box-shadow: 0 0 5px var(--active); color: #000; }
+        .tile.pivot { border: 1px solid var(--pivot); color: var(--pivot); }
+        footer { padding: 20px; background: #111; display: flex; justify-content: space-around; border-top: 1px solid #333; }
+        button { background: #222; color: var(--active); border: 1px solid var(--active); padding: 12px; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>GEO-CO0ODE | 018810 ENGINE</header>
+
+<div id="matrix"></div>
+
+<footer>
+    <button id="save-btn">MIRROR SAVE</button>
+    <button id="print-btn">MIRROR PRINT</button>
+</footer>
+
+<script type="module">
+    // This connects to the modular engine you already built
+    import Orchestrator from './engine/orchestrator.js';
+
+    const matrix = document.getElementById('matrix');
+    const TOTAL_TILES = 960;
+
+    // Initialize the UI Grid
+    function drawGrid() {
+        matrix.innerHTML = '';
+        for (let i = 0; i < TOTAL_TILES; i++) {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.id = `tile-${i}`;
+            if (i === 88 || i % 100 === 88) {
+                tile.classList.add('pivot');
+                tile.innerText = '88';
+            }
+            tile.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                toggleTile(i);
+            });
+            matrix.appendChild(tile);
+        }
+    }
+
+    function toggleTile(index) {
+        const tile = document.getElementById(`tile-${index}`);
+        tile.classList.toggle('active');
+        
+        // 018810 Mirror Logic: Find the reflection
+        const mirrorIndex = (TOTAL_TILES - 1) - index;
+        const mirrorTile = document.getElementById(`tile-${mirrorIndex}`);
+        if (mirrorTile) mirrorTile.classList.toggle('active');
+    }
+
+    // Start the engine logic from your /engine folder
+    window.addEventListener('load', () => {
+        drawGrid();
+        Orchestrator.init();
+    });
+
+    document.getElementById('save-btn').addEventListener('click', () => Orchestrator.save());
+</script>
+
+</body>
+</html>
