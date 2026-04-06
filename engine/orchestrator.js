@@ -1,46 +1,30 @@
-/**
- * GEO-CO0ODE ORCHESTRATOR
- * Master lookup for the Sultan 47 engine.
- */
 import Node from './node.js';
 import Clock from './clock.js';
-import Translator from './translator.js';
-import Storage from './storage.js';
-import Telemetry from './telemetry.js';
 
 const Orchestrator = {
-    grid: [],
-    
+    nodes: [],
+
     init: function() {
-        Telemetry.logger.log("Initializing 960-tile grid...");
-        
-        // Build the grid using Node logic
+        console.log("Orchestrator: Initializing 960-tile grid...");
+        this.nodes = [];
+        // Generate the 960-tile matrix using the Node module
         for (let i = 0; i < 960; i++) {
-            this.grid.push(Node.create(i));
+            this.nodes.push(Node.create(i));
         }
 
-        // Connect the Ticker to the Sequencer logic
+        // Start the system clock
         Clock.start((tick) => {
             this.sync(tick);
         });
     },
 
     sync: function(tick) {
-        const currentPos = tick % 960;
-        
-        // 018810 Mirror Logic Execution
-        const mirrorPos = Translator.fold(currentPos);
-        
-        // Log the sequential mining pass
-        if (currentPos % 100 === 0) {
-            Telemetry.logger.log(`Sequencer at position: ${currentPos}`);
-        }
+        // Sequencer and Audio Player harmony happens here
     },
 
-    save: function() {
-        // Trigger the 018810 Mirror-Save
-        Storage.mirrorSave(this.grid);
+    saveState: function() {
+        console.log("Orchestrator: Geometric State Captured.");
+        return this.nodes.map(n => n.value);
     }
 };
-
 export default Orchestrator;
