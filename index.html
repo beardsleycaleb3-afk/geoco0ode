@@ -5,71 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GEO-CO0ODE | 018810</title>
     <style>
-        body { margin: 0; background: #000; color: #00ff41; font-family: monospace; overflow: hidden; }
-        canvas { display: block; image-rendering: pixelated; width: 100vw; height: 100vh; }
-        .hud { position: absolute; top: 15px; left: 15px; border: 1px solid #00ff41; background: rgba(0,0,0,0.9); padding: 12px; pointer-events: none; width: 250px; }
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
+        canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+        
+        .hud { 
+            position: absolute; top: 10px; left: 10px; 
+            border: 1px solid #00ff41; background: rgba(0, 10, 0, 0.9); 
+            padding: 15px; width: 280px; z-index: 100;
+        }
+        .status-row { font-size: 11px; margin-bottom: 10px; line-height: 1.4; }
+        .terminal { 
+            height: 80px; font-size: 10px; color: #008f11; 
+            overflow: hidden; display: flex; flex-direction: column-reverse;
+            border-top: 1px solid #004411; margin-top: 10px; padding-top: 5px;
+        }
+        .controls { display: flex; gap: 8px; margin-top: 10px; }
+        button { 
+            flex: 1; background: #000; color: #00ff41; border: 1px solid #00ff41; 
+            padding: 12px 5px; font-family: inherit; font-size: 11px; cursor: pointer;
+        }
+        button:active { background: #00ff41; color: #000; }
+        #file-input { display: none; }
     </style>
 </head>
 <body>
-    <div class="hud">
+
+<div class="hud">
+    <div class="status-row">
         SYSTEM: 018810_MIRROR_CORE<br>
-        INPUT: 8-BIT HEX STRANDS<br>
-        STATUS: <span id="status">IDLE</span>
+        RATIO: 3000:1 [GEO-DNA]<br>
+        EM_LINK: <span id="em-status">LOCKED</span>
     </div>
-    <canvas id="canvas"></canvas>
+    <div id="term" class="terminal"></div>
+    <div class="controls">
+        <button id="inject-btn">INJECT_MP3</button>
+        <button id="reset-btn">RESET_GRID</button>
+    </div>
+    <input type="file" id="file-input" accept="audio/mp3">
+</div>
 
-<script type="module">
-    import Orchestrator, { Audio, Acceptor, Storage } from './engine/engine.js';
+<canvas id="stage"></canvas>
 
-    const canvas = document.getElementById('canvas');
+<script>
+    // --- CORE ENGINE LOGIC ---
+    const Engine = {
+        nodes: [],
+        audioCtx: null,
+        analyser: null,
+        isBooted: false,
+
+        // 018810 Geometric Fold
+        fold: (i) => 959 - i,
+
+        init() {
+            this.nodes = [];
+            for (let i = 0; i < 960; i++) {
+                this.nodes.push({
+                    id: i,
+                    value: 0,
+                    isPivot: i === 88 || i % 100 === 88 // The Red Hinge
+                });
+            }
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            this.analyser = this.audioCtx.createAnalyser();
+            this.isBooted = true;
+            this.log("Sultan 47 DAC: Online");
+        },
+
+        log(msg) {
+            const term = document.getElementById('term');
+            const entry = document.createElement('div');
+            entry.textContent = `> ${msg}`;
+            term.prepend(entry);
+        },
+
+        async processAudio(file) {
+            if(!this.isBooted) this.init();
+            this.log(`Loading: ${file.name}`);
+            
+            const arrayBuffer = await file.arrayBuffer();
+            const audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+            const rawData = audioBuffer.getChannelData(0);
+            
+            // Sultan 47 Demodulator: Map frequencies to 480-unit seed
+            const step = Math.floor(rawData.length / 480);
+            for (let i = 0; i < 480; i++) {
+                const sample = Math.abs(rawData[i * step] * 255);
+                // Mirror directly into the nodes
+                this.nodes[i].value = sample;
+                this.nodes[this.fold(i)].value = sample;
+            }
+            
+            document.getElementById('em-status').textContent = "ACTIVE";
+            this.log("Geometric DNA Map: Reconstructed");
+        },
+
+        reset() {
+            this.nodes.forEach(n => n.value = 0);
+            this.log("Grid Cleared");
+        }
+    };
+
+    // --- UI & RENDERER ---
+    const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d', { alpha: false });
-    let emIntensity = 0;
 
-    window.addEventListener('geo-sync', (e) => {
-        emIntensity = e.detail;
-        document.getElementById('status').textContent = emIntensity > 5 ? 'EM_ACTIVE' : 'STABLE';
-    });
-
-    async function boot() {
+    function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        
-        await Audio.init();
-        Orchestrator.init();
-
-        window.addEventListener('keydown', (e) => {
-            Acceptor.process(e.key, (strand) => Orchestrator.typewrite(strand));
-        });
-
-        draw();
     }
 
-    function draw() {
+    function render() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const cw = canvas.width / 30, ch = canvas.height / 32;
-        const jitter = emIntensity * 0.15;
+        const cols = 30;
+        const rows = 32;
+        const cw = canvas.width / cols;
+        const ch = canvas.height / rows;
 
-        Orchestrator.nodes.forEach((n, i) => {
-            if (n.value > 0 || n.isPivot) {
-                const x = (i % 30) * cw, y = Math.floor(i / 30) * ch;
-                
-                // Color mapping: Pivot Red, Data Cyan
-                ctx.fillStyle = n.isPivot ? '#ff0041' : `rgba(0, 240, 255, ${n.value/255})`;
-                ctx.fillRect(x + (Math.random() * jitter), y, cw - 1, ch - 1);
+        if (Engine.nodes.length > 0) {
+            Engine.nodes.forEach((n, i) => {
+                if (n.value > 0 || n.isPivot) {
+                    const x = (i % cols) * cw;
+                    const y = Math.floor(i / cols) * ch;
 
-                // Highlight Typewriter Head
-                if (i === Orchestrator.cursor) {
-                    ctx.strokeStyle = '#fff';
-                    ctx.strokeRect(x, y, cw - 1, ch - 1);
+                    // Rendering: Red for Pivot, Cyan/Green for Data
+                    if (n.isPivot) {
+                        ctx.fillStyle = '#ff0041';
+                    } else {
+                        ctx.fillStyle = `rgba(0, 240, 255, ${n.value / 255})`;
+                    }
+
+                    ctx.fillRect(x, y, cw - 0.5, ch - 0.5);
                 }
-            }
-        });
-        requestAnimationFrame(draw);
+            });
+        }
+        requestAnimationFrame(render);
     }
 
-    boot();
+    // --- EVENT BINDINGS ---
+    document.getElementById('inject-btn').onclick = () => {
+        if(!Engine.isBooted) Engine.init();
+        document.getElementById('file-input').click();
+    };
+
+    document.getElementById('file-input').onchange = (e) => {
+        if(e.target.files[0]) Engine.processAudio(e.target.files[0]);
+    };
+
+    document.getElementById('reset-btn').onclick = () => Engine.reset();
+
+    window.addEventListener('resize', resize);
+    resize();
+    Engine.init(); // Auto-boot grid on load
+    render();
 </script>
+
 </body>
 </html>
