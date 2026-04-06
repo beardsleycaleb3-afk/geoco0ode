@@ -1,37 +1,30 @@
-/**
- * GEO-CO0ODE ORCHESTRATOR
- * The central lookup and management hub.
- */
 import Node from './node.js';
 import Clock from './clock.js';
-// Assumes other modules exist in the same subfolder
-// import Acceptor from './acceptor.js'; 
+import Translator from './translator.js';
+import Acceptor from './acceptor.js';
+import AudioPlayer from './audio.js';
 
 const Orchestrator = {
-    nodes: [],
-    
+    grid: [],
+
     init: function() {
-        console.log("Orchestrator: Initializing 960-tile grid...");
-        
-        // Generate the 960-tile matrix using the Node module
+        // Build 960-tile grid
         for (let i = 0; i < 960; i++) {
-            this.nodes.push(Node.create(i));
+            this.grid.push(Node.create(i));
         }
 
-        // Start the system clock
+        AudioPlayer.init();
+
+        // Ticker drives the Sequencer
         Clock.start((tick) => {
             this.sync(tick);
         });
     },
 
     sync: function(tick) {
-        // This is where the Sequencer and Audio Player are harmonized
-        // Mirror-Print updates would happen here every tick
-    },
-
-    saveState: function() {
-        // Logic for Mirror-Save would be triggered here
-        console.log("Orchestrator: Geometric State Captured.");
+        const currentTile = tick % 960;
+        // 1. Accept data -> 2. Translate/Fold -> 3. Render
+        console.log(`Syncing Tile ${currentTile} at Pivot 88 logic.`);
     }
 };
 
