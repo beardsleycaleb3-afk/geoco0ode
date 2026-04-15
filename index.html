@@ -4,22 +4,115 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>geoco0ode</title>
-    <script>
         const manifest = {
-            "name": "geoco0ode_V1",
-            "short_name": "o0o_V1",
-            "start_url": ".",
-            "display": "standalone, fullscreen",
-            "orientation": "portrait"
-            "background_color": "#050505",
-            "theme_color": "#d0f8d0"
-        };
-        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-        const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = URL.createObjectURL(blob);
-        document.head.appendChild(link);
-    </script>
+        <script type="module">
+    import * as THREE from 'https://esm.sh/three@0.177.0';
+    import { OrbitControls } from 'https://esm.sh/three@0.177.0/examples/jsm/controls/OrbitControls.js';
+
+    let scene, camera, renderer, controls, gridMesh, dummy = new THREE.Object3D();
+    let audioCtx, analyser, dataArray, hits = 0;
+    const TOTAL = 200, geoGrid = [];
+
+    function log(msg) {
+        const div = document.createElement('div');
+        div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        const logPanel = document.getElementById('logPanelEl');
+        logPanel.appendChild(div);
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    function init() {
+        const container = document.getElementById('canvasCtn');
+        
+        // Fix: Make sure container is visible
+        container.style.background = '#111';
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);   // Dark but visible
+
+        camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 10, 45);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Stronger lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(20, 30, 25);
+        scene.add(dirLight);
+
+        // Build grid
+        const phi = Math.PI * (3 - Math.sqrt(5));
+        for (let i = 0; i < TOTAL; i++) {
+            const y = 1 - (i / (TOTAL - 1)) * 2;
+            const r = Math.sqrt(1 - y * y);
+            const theta = phi * i;
+            const dist = i < 100 ? 14 : 7;
+            geoGrid.push({
+                pos: new THREE.Vector3(
+                    Math.cos(theta) * r * dist,
+                    y * dist,
+                    Math.sin(theta) * r * dist
+                ),
+                value: 0,
+                type: i < 100 ? 'outer' : 'inner'
+            });
+        }
+
+        gridMesh = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(0.6, 0.6, 0.6),
+            new THREE.MeshPhongMaterial({ 
+                color: 0xffffff,
+                shininess: 10
+            }),
+            TOTAL
+        );
+        scene.add(gridMesh);
+
+        updateAllNodes();
+        animate();
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        setupInteractions();
+        log("geoco0ode_V1 initialized");
+    }
+
+    // ... keep your updateAllNodes() and setupInteractions() functions ...
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+
+        if (analyser) {
+            analyser.getByteFrequencyData(dataArray);
+            if (dataArray[0] > 140) {
+                const idx = Math.floor(Math.random() * TOTAL);
+                geoGrid[idx].value = 8;
+                hits++;
+                document.getElementById('hitsEl').innerText = hits;
+                updateAllNodes();
+            }
+        }
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('load', init);
+
+    // Remove or fix the service worker part for now — it's also buggy
+</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
         :root {
