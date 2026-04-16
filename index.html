@@ -1,282 +1,662 @@
-<!DOCTYPE html>  
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>geoco0ode</title>
-        const manifest = {
-        <script type="module">
-    import * as THREE from 'https://esm.sh/three@0.177.0';
-    import { OrbitControls } from 'https://esm.sh/three@0.177.0/examples/jsm/controls/OrbitControls.js';
+<meta charset="UTF-8">
+    <link manifest 
+<title>geoco0ode</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<style>
+  body { margin:0; overflow:hidden; background:#000; color:#0f0; font-family:'Courier New', monospace; touch-action: none; }
+  
+  /* Epic Scanline Effect Overlay */ 
+  body::after {
+    content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 50; background-size: 100% 2px, 3px 100%; pointer-events: none;
+  }
 
-    let scene, camera, renderer, controls, gridMesh, dummy = new THREE.Object3D();
-    let audioCtx, analyser, dataArray, hits = 0;
-    const TOTAL = 200, geoGrid = [];
+  #containerEl { position:absolute; top:0; left:0; width:100%; height:100%; }
+  
+  #ui { position:absolute; top:10px; left:0; right:0; z-index:100; text-align:center; pointer-events:none; display:flex; justify-content:center; gap:8px; padding:0 10px; box-sizing:border-box; flex-wrap:wrap;}
+  button { 
+    pointer-events:auto; padding:10px 16px; background:#050505; color:#0f0; 
+    border:1px solid #0f0; font-weight:bold; font-size:13px; text-transform:uppercase; 
+    box-shadow: 0 0 8px rgba(0,255,0,0.2); letter-spacing:1px; font-family:'Courier New', monospace;
+  }
+  button:active { background:#0f0; color:#000; box-shadow: 0 0 15px #0f0; }
+  
+  #statusEl { 
+    position:absolute; top:55px; left:0; right:0; text-align:center; 
+    font-size:10px; text-shadow:0 0 4px #0f0; pointer-events:none; color:#aaffaa; opacity:0.9; text-transform:uppercase; letter-spacing:1px;
+  }
+  
+  #passInfoEl {
+    position:absolute; top:78px; left:0; right:0; text-align:center; 
+    font-size:11px; color:#0ff; text-shadow:0 0 6px #0ff; pointer-events:none; letter-spacing:1px;
+  }
 
-    function log(msg) {
-        const div = document.createElement('div');
-        div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        const logPanel = document.getElementById('logPanelEl');
-        logPanel.appendChild(div);
-        logPanel.scrollTop = logPanel.scrollHeight;
-    }
+  /* Fade Control */
+  #fadeControl {
+    position:absolute; top:110px; left:50%; transform:translateX(-50%);
+    background:rgba(0,20,0,0.95); border:2px solid #0f0; padding:6px 12px; border-radius:4px;
+    display:flex; align-items:center; gap:10px; z-index:95; font-size:10px; box-shadow:0 0 15px rgba(0,255,0,0.3);
+  }
 
-    function init() {
-        const container = document.getElementById('canvasCtn');
-        
-        // Fix: Make sure container is visible
-        container.style.background = '#111';
+  /* Analysis Terminal - Now 5-Pass */
+  #analysisPanelEl {
+    position:absolute; bottom:0; left:0; width:100%; height:52%; 
+    background:rgba(0, 8, 0, 0.9); border-top:2px solid #0f0; 
+    padding:8px; color:#0f0; font-size:10px; pointer-events:auto; 
+    display:flex; flex-direction:column; gap:4px; overflow:hidden; z-index:90;
+    box-shadow: 0 -5px 30px rgba(0, 255, 0, 0.1);
+  }
 
-        scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050505);   // Dark but visible
+  .pass-row { flex:1; border:1px solid #003300; background:rgba(0,20,0,0.6); padding:4px; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+  .pass-row::before { content:''; position:absolute; top:0; left:0; width:2px; height:100%; background:#0f0; opacity:0.3; }
+  
+  .pass-header { 
+    font-size:9px; color:#0ff; text-transform:uppercase; border-bottom:1px solid #004400; margin-bottom:4px; padding-bottom:2px; 
+    display:flex; justify-content:space-between; align-items:center; background:rgba(0,50,0,0.5); padding-left:4px;
+  }
+  
+  .hex-stream { 
+    font-family:'Courier New', monospace; white-space:pre; overflow-y:hidden; 
+    font-size:9px; line-height:1.1; flex:1; word-break:break-all; letter-spacing:-0.5px;
+    text-shadow: 0 0 2px rgba(0,255,0,0.4);
+  }
 
-        camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.set(0, 10, 45);
+  .val-neg { color:#ff3333; text-shadow:0 0 4px #ff0000; }
+  .val-pos { color:#33ff33; text-shadow:0 0 4px #00ff00; }
+  .val-zero { color:#005500; }
 
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        container.appendChild(renderer.domElement);
+  .label-badge { background:#004400; padding:0 4px; border-radius:2px; font-size:8px; border:1px solid #006600; }
 
-        controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-
-        // Stronger lighting
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        dirLight.position.set(20, 30, 25);
-        scene.add(dirLight);
-
-        // Build grid
-        const phi = Math.PI * (3 - Math.sqrt(5));
-        for (let i = 0; i < TOTAL; i++) {
-            const y = 1 - (i / (TOTAL - 1)) * 2;
-            const r = Math.sqrt(1 - y * y);
-            const theta = phi * i;
-            const dist = i < 100 ? 14 : 7;
-            geoGrid.push({
-                pos: new THREE.Vector3(
-                    Math.cos(theta) * r * dist,
-                    y * dist,
-                    Math.sin(theta) * r * dist
-                ),
-                value: 0,
-                type: i < 100 ? 'outer' : 'inner'
-            });
-        }
-
-        gridMesh = new THREE.InstancedMesh(
-            new THREE.BoxGeometry(0.6, 0.6, 0.6),
-            new THREE.MeshPhongMaterial({ 
-                color: 0xffffff,
-                shininess: 10
-            }),
-            TOTAL
-        );
-        scene.add(gridMesh);
-
-        updateAllNodes();
-        animate();
-
-        // Resize handler
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-        });
-
-        setupInteractions();
-        log("geoco0ode_V1 initialized");
-    }
-
-    // ... keep your updateAllNodes() and setupInteractions() functions ...
-
-    function animate() {
-        requestAnimationFrame(animate);
-        controls.update();
-
-        if (analyser) {
-            analyser.getByteFrequencyData(dataArray);
-            if (dataArray[0] > 140) {
-                const idx = Math.floor(Math.random() * TOTAL);
-                geoGrid[idx].value = 8;
-                hits++;
-                document.getElementById('hitsEl').innerText = hits;
-                updateAllNodes();
-            }
-        }
-        renderer.render(scene, camera);
-    }
-
-    window.addEventListener('load', init);
-
-    // Remove or fix the service worker part for now — it's also buggy
-</script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
-        :root {
-            --neon-cyan: #00ffcc; --neon-magenta: #ff00cc; --neon-orange: #ff6600;
-            --neon-yellow: #FFFF00; --neon-green: #00ff88;
-            --bg-dark: #050505; --panel-bg: #d0f8d0; --console-gray: #cfcfcf; --text-on-light: #0a2e0a;
-        }
-        body { margin: 0; padding: 0; overflow: hidden; touch-action: none; background: var(--bg-dark); font-family: 'IBM Plex Mono', monospace; color: #e0e0e0; }
-        #appRoot { display: flex; width: 100vw; height: 100vh; flex-direction: column; }
-        .canary-border { border: 1px solid var(--neon-yellow); box-shadow: 0 0 8px var(--neon-yellow); }
-        #sidebarEl { width: 100%; height: auto; background: var(--panel-bg); display: flex; flex-direction: row; padding: 10px; gap: 10px; overflow-x: auto; color: var(--text-on-light); flex-shrink: 0; }
-        #mainEl { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
-        #headerEl { height: 40px; background: var(--panel-bg); display: flex; align-items: center; padding: 0 15px; justify-content: space-between; color: var(--text-on-light); font-size: 12px; font-weight: bold; }
-        #canvasCtn { flex-grow: 1; position: relative; background: #000; }
-        #bottomPanel { height: 200px; background: var(--panel-bg); border-top: 2px solid var(--neon-yellow); display: flex; flex-direction: column; color: var(--text-on-light); }
-        #bottomToolbar { height: 60px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(0,0,0,0.05); }
-        #logPanelEl { flex: 1; overflow-y: auto; padding: 10px; font-size: 10px; background: var(--console-gray); color: #333; }
-        .square-btn { width: 44px; height: 44px; border-radius: 8px; background: #fff; border: 2px solid var(--neon-yellow); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .telemetry-mini { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; border: 1px solid var(--neon-yellow); font-size: 10px; width: 140px; pointer-events: none; z-index: 10; }
-        .data-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-    </style>
+  /* Freq Canvas Overlay */
+  #freqPanelEl {
+    position:absolute; top:75px; left:50%; transform:translateX(-50%);
+    width:90%; max-width:500px; height:40px; background:rgba(0,0,0,0.5);
+    border:1px solid #0f0; pointer-events:none; z-index:80;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 10px rgba(0,255,0,0.1);
+  }
+  #freqCanvasEl { width:100%; height:100%; display:block; }
+</style>
 </head>
 <body>
-<div id="appRoot">
-    <nav id="sidebarEl">
-        <div style="font-weight:bold; min-width:120px;">geoco0ode_V1</div>
-        <div id="eqBars" style="display:flex; align-items:flex-end; gap:2px; height:30px; flex-grow:1;"></div>
-    </nav>
-    <main id="mainEl">
-        <header id="headerEl" class="canary-border">
-            
-            <span id="mirrorStatus" style="color:var(--neon-magenta)">0oo0,o00o,0o0,o0o,o0,0o,0|0,o0,0o,o0o,0o0,o00o,0oo0</span>
-        </header>
-        <div id="canvasCtn">
-            <div class="telemetry-mini">
-                <div class="data-row"><span>NODES</span> <span id="nodeCount" style="color:var(--neon-green);">0</span></div>
-                <div class="data-row"><span>RATIO</span> <span id="ratioEl" style="color:var(--neon-magenta);">3000:1</span></div>
-                <div class="data-row"><span>HITS</span> <span id="hitsEl">0</span></div>
-            </div>
-        </div>
-        <div id="bottomPanel">
-            <div id="bottomToolbar">
-                <button id="bPulse" class="square-btn">⚡</button>
-                <button id="bRandom" class="square-btn">🎲</button>
-                <button id="bClear" class="square-btn">🔄</button>
-                <button id="bMic" class="square-btn">🎤</button>
-                <button id="bSave" class="square-btn">💾</button>
-            </div>
-            <div id="logPanelEl"></div>
-        </div>
-    </main>
+
+<div id="containerEl"></div>
+
+<div id="ui">
+  
+  <button id="loadBtn">👻</button>
+  <button id="pauseBtn">🌶️</button>
+  <button id="multiPassBtn">🪬</button>
+  <button id="resetPassBtn">💥</button>
+  <button id="exportBtn">💾</button>
 </div>
 
-<script type="module">
-    import * as THREE from 'https://esm.sh/three@0.177.0';
-    import { OrbitControls } from 'https://esm.sh/three@0.177.0/examples/jsm/controls/OrbitControls.js';
+<div id="statusEl">>> SYSTEM READY • WAITING FOR AUDIO INPUT</div>
+<div id="passInfoEl"></div>
 
-    let scene, camera, renderer, controls, gridMesh, dummy = new THREE.Object3D();
-    let audioCtx, analyser, dataArray, hits = 0;
-    const TOTAL = 200, geoGrid = [];
+<!-- Fade Control -->
+<div id="fadeControl">
+  <span>FADE RECONFIG (X/Y + OPPOSITES):</span>
+  <input type="range" id="fadeSliderEl" min="0" max="100" value="50" style="width:220px;">
+  <span id="fadeValueEl">50%</span>
+</div>
 
-    function log(msg) {
-        const div = document.createElement('div');
-        div.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        const logPanel = document.getElementById('logPanelEl');
-        logPanel.appendChild(div);
-        logPanel.scrollTop = logPanel.scrollHeight;
+<div id="freqPanelEl">
+  <canvas id="freqCanvasEl"></canvas>
+</div>
+
+<!-- 5-PASS Logging Chain Analysis Terminal -->
+<div id="analysisPanelEl">
+  <div class="pass-row">
+    <div class="pass-header">
+      <span>CHAIN 01: X-MUTED (HIGHS)</span>
+      <span class="label-badge">FFT BINS 512-1024</span>
+    </div>
+    <div id="pass1StreamEl" class="hex-stream"></div>
+  </div>
+  <div class="pass-row">
+    <div class="pass-header">
+      <span>CHAIN 02: Y-MUTED (LOWS)</span>
+      <span class="label-badge">FFT BINS 0-511</span>
+    </div>
+    <div id="pass2StreamEl" class="hex-stream"></div>
+  </div>
+  <div class="pass-row">
+    <div class="pass-header">
+      <span>CHAIN 03: NEGATIVES</span>
+      <span class="label-badge">WAVEFORM SIGNED INT</span>
+    </div>
+    <div id="pass3StreamEl" class="hex-stream"></div>
+  </div>
+  <div class="pass-row">
+    <div class="pass-header">
+      <span>CHAIN 04: (INVERT)</span>
+      <span class="label-badge">255 - BIN</span>
+    </div>
+    <div id="pass4StreamEl" class="hex-stream"></div>
+  </div>
+  <div class="pass-row">
+    <div class="pass-header">
+      <span>CHAIN 05: 5TH PASS</span>
+      <span class="label-badge">X/Y</span>
+    </div>
+    <div id="pass5StreamEl" class="hex-stream"></div>
+  </div>
+</div>
+
+<input type="file" id="fileInputEl" accept="audio/*" style="display:none;">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script>
+// =============== GEO-COOODE v1.5 — 5-PASS + MULTI-ANALYZER + DATA RECONFIG ===============
+
+
+const container = containerEl;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000510, 40, 300);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
+camera.position.set(0, 50, 130);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement);
+
+// Lighting & Atmosphere
+scene.add(new THREE.AmbientLight(0x001111, 1.2));
+const dirLight = new THREE.DirectionalLight(0x00ffaa, 1.0);
+dirLight.position.set(50, 100, 50);
+scene.add(dirLight);
+
+// Grid/Terrain
+const gridSize = 32;
+const geometry = new THREE.PlaneGeometry(200, 200, gridSize-1, gridSize-1);
+geometry.rotateX(-Math.PI/2);
+const material = new THREE.MeshPhongMaterial({
+  color:0x00ff88, emissive:0x002200, shininess:60, flatShading:true, side:THREE.DoubleSide, wireframe:false
+});
+const terrain = new THREE.Mesh(geometry, material);
+scene.add(terrain);
+
+// Wireframe
+const wireframe = new THREE.LineSegments(
+  new THREE.WireframeGeometry(geometry),
+  new THREE.LineBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.15 })
+);
+scene.add(wireframe);
+
+const positions = geometry.attributes.position.array;
+const baseline = new Float32Array(positions.length);
+for (let i = 0; i < positions.length; i += 3) baseline[i+1] = positions[i+1];
+
+// Touch Controls
+let isDragging = false;
+let prevTouchX = 0, prevTouchY = 0;
+let rotY = 0;
+let camDistance = 130;
+let camHeight = 50;
+let initialPinch = 0;
+
+container.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    prevTouchX = e.touches[0].clientX;
+    prevTouchY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    initialPinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+});
+
+container.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isDragging) {
+    const deltaX = e.touches[0].clientX - prevTouchX;
+    const deltaY = e.touches[0].clientY - prevTouchY;
+    rotY += deltaX * 0.005;
+    camHeight = Math.max(10, Math.min(120, camHeight - deltaY * 0.2));
+    prevTouchX = e.touches[0].clientX;
+    prevTouchY = e.touches[0].clientY;
+    updateCamera();
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    camDistance = Math.max(80, Math.min(250, camDistance * (initialPinch / dist)));
+    initialPinch = dist;
+    updateCamera();
+  }
+}, {passive: false});
+
+function updateCamera() {
+  camera.position.x = Math.sin(rotY) * camDistance;
+  camera.position.z = Math.cos(rotY) * camDistance;
+  camera.position.y = camHeight;
+  camera.lookAt(0, 15, 0);
+  wireframe.position.copy(terrain.position);
+  wireframe.rotation.copy(terrain.rotation);
+}
+
+// ====================== AUDIO CORE (MULTI-ANALYZER + MP3 FIX) ======================
+let audio = new Audio();
+let audioContext, mainAnalyser, bassAnalyser, midAnalyser, highAnalyser;
+let lowFilter, midFilter, highFilter;
+let dataArray, timeDataArray;
+let audioSource = null;           // for MP3
+let mediaStreamSource = null;     // for mic
+let isPlaying = false;
+let useMic = false;
+
+// Multi-pass & data collection system
+let multiPassActive = false;
+let currentPass = 0;
+let passBinSums = new Float32Array(1024);
+let passFrameCount = 0;
+let passData = [];                // Array of 5 Uint8Array (one per pass)
+let collectedAvg = new Uint8Array(1024); // averaged across previous passes
+let fadeFactor = 0.5;             // 0–1 (controlled by slider)
+let reconfiguredData = new Uint8Array(1024);
+
+// DOM
+const freqCanvas = freqCanvasEl;
+const fCtx = freqCanvas.getContext('2d');
+const fadeSlider = fadeSliderEl;
+const fadeValue = fadeValueEl;
+
+function initAudioContext() {
+  if (audioContext) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  audioContext = new AudioContext();
+
+  // === MAIN ANALYZER (full spectrum) ===
+  mainAnalyser = audioContext.createAnalyser();
+  mainAnalyser.fftSize = 2048;
+  mainAnalyser.smoothingTimeConstant = 0.85;
+  dataArray = new Uint8Array(mainAnalyser.frequencyBinCount);
+  timeDataArray = new Uint8Array(mainAnalyser.fftSize);
+
+  // === EXTRA ANALYZERS (all you asked for) + band filters ===
+  lowFilter = audioContext.createBiquadFilter();
+  lowFilter.type = 'lowpass';
+  lowFilter.frequency.value = 250;
+  lowFilter.Q.value = 1.2;
+
+  midFilter = audioContext.createBiquadFilter();
+  midFilter.type = 'bandpass';
+  midFilter.frequency.value = 900;
+  midFilter.Q.value = 2;
+
+  highFilter = audioContext.createBiquadFilter();
+  highFilter.type = 'highpass';
+  highFilter.frequency.value = 2800;
+  highFilter.Q.value = 1.2;
+
+  bassAnalyser = audioContext.createAnalyser();
+  bassAnalyser.fftSize = 512;
+  bassAnalyser.smoothingTimeConstant = 0.92;
+
+  midAnalyser = audioContext.createAnalyser();
+  midAnalyser.fftSize = 1024;
+  midAnalyser.smoothingTimeConstant = 0.88;
+
+  highAnalyser = audioContext.createAnalyser();
+  highAnalyser.fftSize = 1024;
+  highAnalyser.smoothingTimeConstant = 0.8;
+}
+
+async function ensureAudioContext() {
+  if (!audioContext) initAudioContext();
+  if (audioContext.state === 'suspended') await audioContext.resume();
+}
+
+// ====================== MP3 FIX + SOURCE CONNECTION ======================
+function connectAudioSource(isMic) {
+  if (audioSource) audioSource.disconnect();
+  if (mediaStreamSource) mediaStreamSource.disconnect();
+
+  if (isMic) {
+    // mic already created its own stream source in micBtn handler
+    return;
+  }
+
+  // MP3 — now properly connected so terrain + terminal react
+  audioSource = audioContext.createMediaElementSource(audio);
+  audioSource.connect(mainAnalyser);
+  mainAnalyser.connect(audioContext.destination); // hear the music
+
+  // Parallel taps for band analyzers
+  audioSource.connect(lowFilter);
+  lowFilter.connect(bassAnalyser);
+
+  audioSource.connect(midFilter);
+  midFilter.connect(midAnalyser);
+
+  audioSource.connect(highFilter);
+  highFilter.connect(highAnalyser);
+}
+
+// ====================== UI BUTTONS ======================
+const fileInput = fileInputEl;
+
+loadBtn.onclick = () => fileInput.click();
+fileInput.onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  await ensureAudioContext();
+  audio.src = URL.createObjectURL(file);
+  audio.onloadedmetadata = () => {
+    useMic = false;
+    connectAudioSource(false);
+    statusEl.textContent = `LOADED • ${file.name} • 5-PASS READY`;
+    multiPassActive = false;
+    currentPass = 0;
+    passInfoEl.textContent = '';
+  };
+  audio.play();
+  isPlaying = true;
+};
+
+micBtn.onclick = async () => {
+  if (useMic) {
+    stopPlayback();
+    micBtn.textContent = "🎤 MIC";
+    statusEl.textContent = 'MIC STOPPED';
+    return;
+  }
+  try {
+    await ensureAudioContext();
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+    mediaStreamSource.connect(mainAnalyser);
+    mediaStreamSource.connect(lowFilter);
+    lowFilter.connect(bassAnalyser);
+    mediaStreamSource.connect(midFilter);
+    midFilter.connect(midAnalyser);
+    mediaStreamSource.connect(highFilter);
+    highFilter.connect(highAnalyser);
+    useMic = true;
+    isPlaying = true;
+    micBtn.textContent = "⏹ STOP";
+    statusEl.textContent = 'MIC LIVE • 5-PASS READY';
+  } catch(err) { alert('Mic access denied'); }
+};
+
+pauseBtn.onclick = async () => {
+  await ensureAudioContext();
+  if (useMic) return;
+  if (audio.paused) {
+    audio.play();
+    isPlaying = true;
+    pauseBtn.textContent = "PAUSE";
+  } else {
+    audio.pause();
+    isPlaying = false;
+    pauseBtn.textContent = "PLAY";
+  }
+};
+
+calibrateBtn.onclick = () => {
+  for (let i = 0; i < positions.length; i += 3) baseline[i+1] = positions[i+1];
+  statusEl.textContent = '>> BASELINE CALIBRATED';
+};
+
+// 5-PASS MODE
+multiPassBtn.onclick = async () => {
+  if (useMic || !audio.src) {
+    alert('Load an MP3 first (mic not supported in multi-pass)');
+    return;
+  }
+  await ensureAudioContext();
+  multiPassActive = true;
+  currentPass = 0;
+  passData = [];
+  passBinSums.fill(0);
+  passFrameCount = 0;
+  collectedAvg.fill(0);
+  passInfoEl.textContent = 'MULTI-PASS STARTING • PASS 1/5';
+  statusEl.textContent = '5-PASS MODE • COLLECTING DATA POINTS';
+  audio.loop = false;
+  audio.currentTime = 0;
+  audio.play();
+  isPlaying = true;
+};
+
+// Reset everything
+resetPassBtn.onclick = () => {
+  multiPassActive = false;
+  currentPass = 0;
+  passData = [];
+  passBinSums.fill(0);
+  collectedAvg.fill(0);
+  passInfoEl.textContent = '';
+  statusEl.textContent = 'DATA RESET • READY FOR NEW RUN';
+};
+
+// Export collected data points (hex, bins, opposites, negatives)
+exportBtn.onclick = () => {
+  if (passData.length === 0) {
+    alert('Run a 5-pass first!');
+    return;
+  }
+  const exportObj = {
+    timestamp: new Date().toISOString(),
+    passes: passData.map((arr, i) => ({
+      pass: i+1,
+      frequencyBins: Array.from(arr),
+      hex: Array.from(arr).map(v => v.toString(16).toUpperCase().padStart(2,'0'))
+    })),
+    collectedAverage: Array.from(collectedAvg),
+    opposites: Array.from(collectedAvg).map(v => 255 - v),
+    fadeUsed: fadeFactor
+  };
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'geocode-audio-data-points.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  statusEl.textContent = 'DATA POINTS EXPORTED (JSON)';
+};
+
+// Audio ended handler for multi-pass
+audio.addEventListener('ended', () => {
+  if (!multiPassActive) return;
+
+  // Finalize this pass's average
+  const passAvg = new Uint8Array(1024);
+  for (let i = 0; i < 1024; i++) {
+    passAvg[i] = Math.floor(passBinSums[i] / (passFrameCount || 1));
+  }
+  passData.push(passAvg);
+
+  // Reset sums for next pass
+  passBinSums.fill(0);
+  passFrameCount = 0;
+
+  currentPass++;
+
+  if (currentPass < 5) {
+    passInfoEl.textContent = `MULTI-PASS • PASS ${currentPass + 1}/5 (collecting)`;
+    audio.currentTime = 0;
+    audio.play();
+  } else {
+    // 5 passes complete → compute final collected average + enable reconfig on next play
+    multiPassActive = false;
+    // Average all 5 passes into collectedAvg
+    for (let i = 0; i < 1024; i++) {
+      let sum = 0;
+      for (let p = 0; p < passData.length; p++) sum += passData[p][i];
+      collectedAvg[i] = Math.floor(sum / passData.length);
+    }
+    passInfoEl.textContent = '5-PASS COMPLETE • RECONFIG FADE ACTIVE (adjust slider)';
+    statusEl.textContent = 'DATA COLLECTED • 5TH PASS RECONFIGURED';
+    // Start the 5th visual pass with reconfig immediately
+    audio.currentTime = 0;
+    audio.play();
+    isPlaying = true;
+    currentPass = 5; // flag for animate()
+  }
+});
+
+// Fade slider live update
+fadeSlider.oninput = () => {
+  fadeFactor = parseFloat(fadeSlider.value) / 100;
+  fadeValue.textContent = fadeSlider.value + '%';
+};
+
+function stopPlayback() {
+  if (!useMic) audio.pause();
+  isPlaying = false;
+}
+
+function getAvgBass() {
+  let sum = 0;
+  const halfLen = Math.floor(dataArray.length * 0.25);
+  for (let i = 0; i < halfLen; i++) sum += dataArray[i];
+  return sum / halfLen;
+}
+
+let frameCount = 0;
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (isPlaying && mainAnalyser) {
+    mainAnalyser.getByteFrequencyData(dataArray);
+    mainAnalyser.getByteTimeDomainData(timeDataArray);
+
+    // === MULTI-PASS COLLECTION ===
+    if (multiPassActive && currentPass < 5) {
+      for (let i = 0; i < 1024; i++) {
+        passBinSums[i] += dataArray[i];
+      }
+      passFrameCount++;
     }
 
-    function init() {
-        const container = document.getElementById('canvasCtn');
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
-        camera.position.z = 40;
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        container.appendChild(renderer.domElement);
-        controls = new OrbitControls(camera, renderer.domElement);
-
-        // Build 018810 Mirror Grid
-        const phi = Math.PI * (3 - Math.sqrt(5));
-        for (let i = 0; i < TOTAL; i++) {
-            const y = 1 - (i / (TOTAL - 1)) * 2;
-            const r = Math.sqrt(1 - y * y);
-            const theta = phi * i;
-            const dist = i < 100 ? 14 : 7; // Outer (14) vs Inner (7)
-            geoGrid.push({
-                pos: new THREE.Vector3(Math.cos(theta) * r * dist, y * dist, Math.sin(theta) * r * dist),
-                value: 0,
-                type: i < 100 ? 'outer' : 'inner'
-            });
-        }
-
-        gridMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshPhongMaterial({ color: 0xffffff }), TOTAL);
-        scene.add(gridMesh);
-        scene.add(new THREE.AmbientLight(0xffffff, 1));
-        
-        updateAllNodes();
-        animate();
-        setupInteractions();
+    // === RECONFIGURED DATA (5th pass only) ===
+    let useReconfig = (currentPass === 5);
+    if (useReconfig) {
+      for (let i = 0; i < 1024; i++) {
+        const original = dataArray[i];
+        const opposite = 255 - collectedAvg[i];
+        reconfiguredData[i] = Math.floor(original * (1 - fadeFactor) + opposite * fadeFactor);
+      }
     }
 
-    function updateAllNodes() {
-        geoGrid.forEach((n, i) => {
-            dummy.position.copy(n.pos);
-            dummy.lookAt(0,0,0);
-            const s = n.value > 0 ? 1.5 : 1.0;
-            dummy.scale.set(s,s,s);
-            dummy.updateMatrix();
-            gridMesh.setMatrixAt(i, dummy.matrix);
-            gridMesh.setColorAt(i, n.value === 8 ? new THREE.Color(0xff00cc) : (n.value === 1 ? new THREE.Color(0x00ffcc) : new THREE.Color(0x222222)));
-        });
-        gridMesh.instanceMatrix.needsUpdate = true;
-        if (gridMesh.instanceColor) gridMesh.instanceColor.needsUpdate = true;
-        
-        const active = geoGrid.filter(n => n.value > 0).length;
-        document.getElementById('nodeCount').innerText = active;
-        document.getElementById('ratioEl').innerText = active > 0 ? `1:${active * 3000}` : "3000:1";
-    }
+    // === TERRAIN LOGIC (now uses reconfigured bins on 5th pass) ===
+    let bassEnergy = 0;
+    for (let i = 0; i < 16; i++) bassEnergy += dataArray[i];
+    const avgBass = bassEnergy / 16;
+    const intensity = avgBass / 255;
 
-    function setupInteractions() {
-        document.getElementById('bRandom').onclick = () => {
-            geoGrid.forEach(n => n.value = Math.random() > 0.9 ? 1 : 0);
-            log("018810: Entropy Sync");
-            updateAllNodes();
-        };
-        document.getElementById('bClear').onclick = () => {
-            geoGrid.forEach(n => n.value = 0);
-            hits = 0; document.getElementById('hitsEl').innerText = "0";
-            log("System: Zero State");
-            updateAllNodes();
-        };
-        document.getElementById('bPulse').onclick = () => {
-            geoGrid.forEach(n => { if(n.value > 0) n.value = n.value === 1 ? 8 : 1; });
-            log("Pulse: V-Vector Shift");
-            updateAllNodes();
-        };
-        document.getElementById('bMic').onclick = async () => {
-            if (!audioCtx) {
-                audioCtx = new AudioContext();
-                analyser = audioCtx.createAnalyser();
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioCtx.createMediaStreamSource(stream).connect(analyser);
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-                log("Audio: MIC_LOCKED");
-            }
-        };
-    }
+    const activeData = useReconfig ? reconfiguredData : dataArray;
 
-    function animate() {
-        requestAnimationFrame(animate);
-        if (analyser) {
-            analyser.getByteFrequencyData(dataArray);
-            if (dataArray[0] > 150) { // Bass Kick
-                const idx = Math.floor(Math.random() * 200);
-                geoGrid[idx].value = 8;
-                hits++; document.getElementById('hitsEl').innerText = hits;
-                updateAllNodes();
-            }
-        }
-        renderer.render(scene, camera);
-    }
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      const idx = i * 3 + 1;
+      const logIdx = Math.floor(Math.pow(i / (gridSize * gridSize), 2) * (activeData.length * 0.8));
+      const targetWave = (activeData[logIdx] / 255) * 35;
+      const jitter = (timeDataArray[i % 512] - 128) * 0.15;
 
-    window.addEventListener('load', init);
+      const targetHeight = baseline[idx] + (targetWave * (1 + intensity * 3.5)) + jitter;
+      positions[idx] += (targetHeight - positions[idx]) * 0.15;
+    }
+    geometry.attributes.position.needsUpdate = true;
+    geometry.computeVertexNormals();
+
+    // Color shift
+    const hue = 140 + intensity * 180;
+    terrain.material.color.setHSL(hue/360, 0.9, 0.5);
+    terrain.material.emissive.setHSL(hue/360, 1.0, 0.1);
+
+    // Throttled UI
+    if (frameCount % 3 === 0) {
+      updateFreqCanvas();
+      updateLoggingChain(useReconfig);
+    }
+  }
+
+  if (!isDragging) {
+    rotY += 0.0006;
+    updateCamera();
+  }
+  frameCount++;
+  renderer.render(scene, camera);
+}
+
+function updateLoggingChain(useReconfig) {
+  const density = 8;
+  const activeData = useReconfig ? reconfiguredData : dataArray;
+
+  // PASS 1: HIGHS
+  let p1 = "";
+  for(let i=512; i<1024; i+=density) {
+    let v = activeData[i];
+    p1 += `<span class="${v > 150 ? 'val-pos' : 'val-zero'}">${v.toString(16).toUpperCase().padStart(2,'0')}</span> `;
+  }
+  pass1StreamEl.innerHTML = p1;
+
+  // PASS 2: LOWS
+  let p2 = "";
+  for(let i=0; i<512; i+=density) {
+    let v = activeData[i];
+    p2 += `<span class="${v > 180 ? 'val-pos' : 'val-zero'}">${v.toString(16).toUpperCase().padStart(2,'0')}</span> `;
+  }
+  pass2StreamEl.innerHTML = p2;
+
+  // PASS 3: SIGNED WAVEFORM
+  let p3 = "";
+  for(let i=0; i<1024; i+=density*2) {
+    let s = timeDataArray[i] - 128;
+    let cls = s > 15 ? 'val-pos' : (s < -15 ? 'val-neg' : 'val-zero');
+    p3 += `<span class="${cls}">${s >= 0 ? '+' : ''}${s}</span> `;
+  }
+  pass3StreamEl.innerHTML = p3;
+
+  // PASS 4: OPPOSITES (255 - collected avg)
+  let p4 = "";
+  for(let i=0; i<1024; i+=density) {
+    let v = (collectedAvg[i] > 0) ? (255 - collectedAvg[i]) : (255 - dataArray[i]);
+    p4 += `<span class="${v > 128 ? 'val-pos' : 'val-zero'}">${v.toString(16).toUpperCase().padStart(2,'0')}</span> `;
+  }
+  pass4StreamEl.innerHTML = p4;
+
+  // PASS 5: RECONFIGURED FADE (only shown during 5th pass)
+  let p5 = "";
+  for(let i=0; i<1024; i+=density) {
+    let v = activeData[i];
+    p5 += `<span class="${v > 140 ? 'val-pos' : 'val-zero'}">${v.toString(16).toUpperCase().padStart(2,'0')}</span> `;
+  }
+  pass5StreamEl.innerHTML = p5;
+}
+
+function updateFreqCanvas() {
+  const w = freqCanvas.width = freqPanelEl.clientWidth;
+  const h = freqCanvas.height = freqPanelEl.clientHeight;
+  fCtx.fillStyle = '#000500';
+  fCtx.fillRect(0,0,w,h);
+  const barW = w / 32;
+  for (let i = 0; i < 32; i++) {
+    const val = dataArray[i * 4];
+    const barH = (val / 255) * h;
+    fCtx.fillStyle = val > 200 ? '#0ff' : '#0f0';
+    fCtx.fillRect(i*barW, h-barH, barW-1, barH);
+  }
+}
+
+// Start everything
+animate();
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.4 / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
 
     if ('serviceWorker' in navigator) {
         const swCode = `
