@@ -1,0 +1,19 @@
+{
+  "short_name": "geoco0ode",
+  "name": "geoco0ode",
+  "icons": [
+    {
+      "src": "./icon.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#000510",
+  "orientation": "portrait",
+  "display": "fullscreen",
+  "scope": "./",
+  "theme_color": "#00ff88",
+  "description": "Geometric Data Compression & Audio Analysis Terminal"
+}
