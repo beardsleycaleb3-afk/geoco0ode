@@ -1,4 +1,4 @@
-const CACHE_NAME = 'geocoode-v2';
+const CACHE_NAME = 'geocoode-v3';
 const ASSETS = [
   './',
   './index.html',
