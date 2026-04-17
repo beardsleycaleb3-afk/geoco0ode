@@ -81,7 +81,7 @@
 
 <div id="ui">
   <button id="loadBtn">👻 LOAD</button>
-  <button id="micBtn">🎤 MIC</button>
+  
   <button id="calibrateBtn">📏 CAL</button>
   <button id="pauseBtn">⏸ PAUSE</button>
   <button id="multiPassBtn">🪬 5-PASS</button>
@@ -90,7 +90,7 @@
   <button id="exportBtn">💾 EXP</button>
 </div>
 
-<div id="statusEl">GEOCO0ODE v2.1 • ANDROID READY</div>
+<div id="statusEl">geoco0ode</div>
 <div id="passInfoEl"></div>
 
 <!-- 5-PASS ANALYSIS (bottom) -->
@@ -414,7 +414,7 @@ window.addEventListener('resize', () => {
 // SERVICE WORKER AT THE VERY END (for your repo)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('data:application/javascript,' + encodeURIComponent(`
-    self.addEventListener('install', e => e.waitUntil(caches.open('geoco0ode-v21').then(c => c.addAll(['./']))));
+    self.addEventListener('install', e => e.waitUntil(caches.open('geoco0ode').then(c => c.addAll(['./']))));
     self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))));
   `)).then(() => console.log('%c✅ SW ready for repo', 'color:#0f0'));
 }
