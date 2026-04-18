@@ -1,0 +1,55 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy static content to Pages
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Single deploy job since we're just deploying
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+            - name: SecureStack All-In-One GitHub Action
+  # You may pin to the exact commit or the version.
+  # uses: SecureStackCo/actions-all-in-one@96dc79a3c4081a8333040c6bf84b0c528ccb1eb9
+  uses: SecureStackCo/actions-all-in-one@v0.1.2
+  with:
+    # SecureStack API key - generate an API key at https://app.securestack.com
+    securestack_api_key: 
+    # SecureStack Application ID - can be retrieved by accessing required application at https://app.securestack.com
+    securestack_app_id: 
+    # Severities lower than this value will be reported in the workflow console but will not cause an error for the action; value should be one of: critical | high | medium | low
+    severity: 
+          
