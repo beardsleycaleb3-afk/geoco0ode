@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="manifest" href="/manifest.json">
+<meta name="description" content="geoco0ode">
+<title>geoco0ode</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#020617">
+
+<style>
+    body { margin:0; padding:0; background:#000; font-family:'Courier New',monospace; color:#e2e8f0; overflow:hidden; touch-action:manipulation; height:100dvh; width:100vw; -webkit-tap-highlight-color:transparent; }
+    #appCtn { position:absolute; top:0; left:0; right:0; bottom:0; background:#020617; display:flex; flex-direction:column; width:100%; height:100%; max-width:600px; margin:0 auto; box-shadow:0 0 50px rgba(0,0,0,0.8); }
+    
+    header { padding:8px; border-bottom:1px solid #1e293b; display:flex; justify-content:space-between; align-items:center; background:rgba(2,6,23,0.98); flex-shrink:0; min-height:40px; }
+  
+    .core-badge { width:32px; height:32px; background:#06b6d4; color:#000; font-weight:900; font-size:12px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 0 15px rgba(6,182,212,0.4); }
+  
+    .header-text div:first-child { font-weight:900; font-size:12px; line-height:1.1; letter-spacing:1px; }
+    .header-text div:last-child { font-size:8px; color:#06b6d4; letter-spacing:1px; }
+    
+    .pass-selector { display:flex; gap:4px; padding:6px; background:#0a1421; justify-content:center; flex-shrink:0; overflow-x:auto; }
+    .pass-dot { width:28px; height:28px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; border:2px solid #334155; flex-shrink:0; transition:all 0.2s ease; touch-action:manipulation; }
+    .pass-dot.active { background:#06b6d4; color:#000; box-shadow:0 0 10px #06b6d4; border-color:#06b6d4; transform:scale(1.1); }
+    .pass-dot.complete { background:#1e293b; color:#64748b; border-color:#1e293b; }
+
+    .status-bar { text-align:center; padding:4px; font-size:10px; color:#94a3b8; border-bottom:1px solid #1e293b; background:#0f172a; min-height:28px; display:flex; flex-direction:column; justify-content:center; }
+    
+    .matrix-wrapper { flex:1; display:flex; align-items:center; justify-content:center; background:#000; position:relative; overflow:hidden; }
+    #mainCanvasEl { width:300px; height:320px; image-rendering:pixelated; border:2px solid #1e293b; box-shadow:0 0 25px rgba(0,255,255,0.15); background:#020617; }
+    
+    .upload-overlay { position:absolute; inset:0; background:rgba(2,6,23,0.96); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; z-index:10; backdrop-filter:blur(5px); }
+    .upload-icon { font-size:32px; margin-bottom:12px; color:#06b6d4; text-shadow:0 0 20px rgba(6,182,212,0.6); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.7; transform:scale(0.95); } }
+    
+    button { 
+        border:none; 
+        border-radius:4px; 
+        font-family:'Courier New',monospace; 
+        font-weight:900; 
+        font-size:10px; 
+        cursor:pointer; 
+        touch-action:manipulation; 
+        transition:all 0.1s ease-out; 
+        text-transform:uppercase; 
+        letter-spacing:0.5px; 
+        position:relative; 
+        overflow:hidden; 
+        height: 20px; 
+        min-height: 20px;
+        line-height: 20px;
+        padding: 0 10px;
+        display: flex; 
+        align-items: center;
+        justify-content: center;
+    }
+    button::after { content:''; position:absolute; inset:0; background:rgba(255,255,255,0.1); transform:translateX(-100%); transition:transform 0.3s; }
+    button:active::after { transform:translateX(0); }
+    button:active { transform:scale(0.95); }
+    button:disabled { opacity:0.4; cursor:not-allowed; } 
+    
+    .controls { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px; background:#020617; border-top:1px solid #1e293b; flex-shrink:0; padding-bottom:max(10px, env(safe-area-inset-bottom)); }
+    
+    
+    .btn-primary { background:linear-gradient(135deg, #06b6d4, #0891b2); color:#000; grid-column:span 2; box-shadow:0 2px 10px rgba(6,182,212,0.4); }
+    .btn-secondary { background:#1e293b; color:#94a3b8; border:1px solid #334155; }
+    .btn-download { background:rgba(6,182,212,0.15); color:#06b6d4; border:1px solid #06b6d4; }
+    .btn-play { background:linear-gradient(135deg, #22c55e, #16a34a); color:#000; grid-column:span 2; box-shadow:0 2px 10px rgba(34,197,94,0.4); }
+    .btn-image { background:linear-gradient(135deg, #a855f7, #9333ea); color:#fff; grid-column:span 2; box-shadow:0 2px 10px rgba(168,85,247,0.4); }
+
+    .channel-viz { display:flex; gap:4px; height:4px; width:100%; margin-top:4px; max-width:200px; margin-left:auto; margin-right:auto; }
+    .chan-bar { flex:1; background:#1e293b; border-radius:2px; transition:all 0.3s; }
+    .chan-bar.x-active { background:#f59e0b; box-shadow:0 0 8px rgba(245,158,11,0.8); }
+    .chan-bar.y-active { background:#06b6d4; box-shadow:0 0 8px rgba(6,182,212,0.8); }
+
+    .progress-bar { position:absolute; bottom:0; left:0; height:2px; background:#06b6d4; width:0%; transition:width 0.1s linear; box-shadow:0 0 5px #06b6d4; }
+</style>
+</head>
+<body>
+
+<div id="appCtn">
+    <header>
+        <div style="display:flex;gap:10px;align-items:center;overflow:hidden;">
+            <div class="core-badge">01</div>
+            <div class="header-text">
+                <div>geoco0ode</div>
+                <div>5-PASS RECTIFIER</div>
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:9px;color:#64748b;">GRID</div>
+            <div style="font-size:11px;font-weight:bold;color:#06b6d4;">30x32</div>
+        </div>
+    </header>
+
+    <div class="pass-selector" id="passSelectorEl"></div>
+    
+    <div class="status-bar">
+        <span id="statusEl">UPLOAD AUDIO</span>
+        <div class="channel-viz">
+            <div id="vizX" class="chan-bar"></div>
+            <div id="vizY" class="chan-bar"></div>
+        </div>
+    </div>
+
+    <div class="matrix-wrapper">
+        <canvas id="mainCanvasEl" width="300" height="320"></canvas>
+        <div class="progress-bar" id="progressBarEl"></div>
+        <div id="uploadOverlayEl" class="upload-overlay">
+            <div class="upload-icon">⬆</div>
+            <div style="font-weight:900;font-size:14px;margin-bottom:8px;color:#e2e8f0;">UPLOAD AUDIO</div>
+            <div style="color:#64748b;font-size:10px;margin-bottom:20px;">MP3 • WAV • OGG • FLAC</div>
+            <button id="uploadBtn" style="background:#06b6d4;color:#000;min-width:120px;">SELECT FILE</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="playBtn" class="btn-play" style="display:none;">♪ PLAY</button>
+        <button id="startBtn" class="btn-primary" style="display:none;">▶ START 5-PASS</button>
+        <button id="resetBtn" class="btn-secondary">RST</button>
+        <button id="downloadBtn" class="btn-download">EXP</button>
+        <button id="imageBtn" class="btn-image" style="display:none;">🖼 LOAD PASS 01 IMG</button>
+    </div>
+</div>
+
+<input type="file" id="audioInputEl" accept="audio/*" style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1;">
+<input type="file" id="imageInputEl" accept="image/*" style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;z-index:-1;">
+  
+</body>
+
+<script>
+const MATRIX_SIZE = 960;
+const COLS = 30;
+const ROWS = 32;
+const TILE_SIZE = 10;
+const PASS_COUNT = 5;
+const TILE_DELAY_MS = 1000;  // Exactly 1 tile per second
+
+const PASS_CONFIG = [
+    { id: 1, name: "PASS 01: Visual Foundation", desc: "Image Ground + Audio", filter: 'allpass' },
+    { id: 2, name: "PASS 02: X-Channel", desc: "Bass (Low-Freq)", filter: 'lowpass', freq: 400 },
+    { id: 3, name: "PASS 03: Y-Channel", desc: "Treble (High-Freq)", filter: 'highpass', freq: 2000 },
+    { id: 4, name: "PASS 04: Negative Inversion", desc: "Negentropy Analysis", filter: 'notch', freq: 1000, q: 10 },
+    { id: 5, name: "PASS 05: Geometric Half-Blend", desc: "0oo0 Mirror Synthesis", filter: 'peaking', freq: 1000, gain: 0 }
+];
+
+let rectifierState = {
+    currentPass: 1,
+    fillProgress: 0,
+    isProcessing: false,
+    audioBuffer: null,
+    matrixData: new Uint8Array(MATRIX_SIZE),
+    passHistory: [],
+    audioContext: null,
+    startTime: 0,
+    isPlaying: false,
+    imageData: null
+};
+
+let logEntries = [];
+let currentAudioSource = null;
+let animationFrameId = null;
+let isAudioPlaying = false;
+
+const canvas = document.getElementById('mainCanvasEl');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const imageCanvas = document.createElement('canvas');
+imageCanvas.width = COLS;
+imageCanvas.height = ROWS;
+const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+
+function initPassSelector() {
+    const container = document.getElementById('passSelectorEl');
+    container.innerHTML = '';
+    PASS_CONFIG.forEach((pass) => {
+        const dot = document.createElement('div');
+        dot.className = 'pass-dot';
+        dot.id = `passDot${pass.id}`;
+        dot.textContent = String(pass.id).padStart(2, '0');
+        dot.title = pass.name;
+        container.appendChild(dot);
+    });
+}
+
+function updatePassUI() {
+    const pass = PASS_CONFIG[rectifierState.currentPass - 1];
+    const statusText = isAudioPlaying ? `<span style="color:#22c55e">▶</span> ` : '';
+    document.getElementById('statusEl').innerHTML = statusText + pass.name + ' — ' + pass.desc;
+    
+    PASS_CONFIG.forEach((p) => {
+        const dot = document.getElementById(`passDot${p.id}`);
+        if (dot) {
+            dot.classList.toggle('active', p.id === rectifierState.currentPass);
+            dot.classList.toggle('complete', p.id < rectifierState.currentPass);
+        }
+    });
+}
+
+function byteToColor(byte) {
+    const v = Math.floor(byte);
+    let hue;
+    if (v < 85) {
+        hue = 360 - ((v / 85) * 300);
+        if (hue < 0) hue += 360;
+    } else if (v < 170) {
+        hue = 60 + (((v - 85) / 85) * 120);
+    } else {
+        hue = 180 + (((v - 170) / 85) * 180);
+    }
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
+function drawTile(index, value) {
+    const col = index % COLS;
+    const row = Math.floor(index / COLS);
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+
+    ctx.fillStyle = byteToColor(value);
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    if (value > 80) {
+        const hex = value.toString(16).toUpperCase().padStart(2, '0');
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'black';
+        ctx.strokeText(hex, x + TILE_SIZE/2, y + TILE_SIZE/2);
+        ctx.fillStyle = 'white';
+        ctx.fillText(hex, x + TILE_SIZE/2, y + TILE_SIZE/2);
+    }
+}
+
+async function loadPass01Image(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const img = new Image();
+            img.onload = () => {
+                imageCtx.clearRect(0, 0, COLS, ROWS);
+                imageCtx.drawImage(img, 0, 0, COLS, ROWS);
+                const imgData = imageCtx.getImageData(0, 0, COLS, ROWS);
+                const pixelData = new Uint8Array(MATRIX_SIZE);
+                
+                for (let i = 0; i < MATRIX_SIZE; i++) {
+                    const idx = i * 4;
+                    const r = imgData.data[idx];
+                    const g = imgData.data[idx + 1];
+                    const b = imgData.data[idx + 2];
+                    pixelData[i] = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+                }
+                
+                rectifierState.imageData = pixelData;
+                resolve(pixelData);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function getPixelLuminance(index) {
+    if (!rectifierState.imageData) {
+        const mirroredIndex = (MATRIX_SIZE - 1) - index;
+        if (mirroredIndex >= 0 && mirroredIndex < MATRIX_SIZE) {
+            return rectifierState.matrixData[mirroredIndex] || 0;
+        }
+        return 0;
+    }
+    
+    const mirroredIndex = (MATRIX_SIZE - 1) - index;
+    if (mirroredIndex >= 0 && mirroredIndex < MATRIX_SIZE) {
+        return rectifierState.imageData[mirroredIndex];
+    }
+    return 0;
+}
+
+function getAudioDataForPass(pass, buffer) {
+    const channelData = buffer.getChannelData(0);
+    const totalSamples = channelData.length;
+    const samplesPerTile = Math.max(1, Math.floor(totalSamples / MATRIX_SIZE));
+    
+    const rawData = new Uint8Array(MATRIX_SIZE);
+    for (let i = 0; i < MATRIX_SIZE; i++) {
+        let sum = 0;
+        let sampleCount = 0;
+        
+        for (let j = 0; j < samplesPerTile; j++) {
+            const idx = (i * samplesPerTile) + j;
+            if (idx < totalSamples) {
+                sum += Math.abs(channelData[idx]);
+                sampleCount++;
+            }
+        }
+        
+        let avg = sampleCount > 0 ? sum / sampleCount : 0;
+        rawData[i] = Math.min(255, Math.floor(avg * 255));
+    }
+
+    const data = new Uint8Array(MATRIX_SIZE);
+    for (let i = 0; i < MATRIX_SIZE; i++) {
+        let val = rawData[i];
+
+        switch(pass.id) {
+            case 1:
+                let imgValue = getPixelLuminance(i); 
+                val = Math.floor((val * 0.5) + (imgValue * 0.5));
+                break;
+                
+            case 2:
+                val = Math.min(255, Math.floor(val * 1.4));
+                if (val > 170) val = Math.floor(val * 0.65 + 50);
+                break;
+                
+            case 3:
+                val = 255 - val;
+                val = Math.min(255, Math.floor(val * 1.2));
+                break;
+                
+            case 4:
+                if (rectifierState.passHistory[0]) {
+                    const baseVal = rectifierState.passHistory[0][i];
+                    const diff = Math.abs(baseVal - val);
+                    val = Math.min(255, Math.floor(diff * 2.8));
+                    if (val < 40) val = Math.floor(val * 0.3);
+                }
+                break;
+                
+            case 5:
+                if (rectifierState.passHistory[0] && rectifierState.passHistory[1] && rectifierState.passHistory[3]) {
+                    const p1 = rectifierState.passHistory[0][i];
+                    const p2 = rectifierState.passHistory[1][i];
+                    const p3 = rectifierState.passHistory[2][i];
+                    const p4 = rectifierState.passHistory[3][i];
+                    
+                    const xyAvg = Math.floor((p2 + p3) / 2);
+                    const entropyFactor = p4 / 255;
+                    const visualFactor = p1 / 255;
+                    val = Math.floor(p1 * 0.15 + xyAvg * 0.45 + (xyAvg * entropyFactor) * 0.25 + (p1 * visualFactor) * 0.15);
+                }
+                break;
+        }
+
+        data[i] = Math.max(0, Math.min(255, val));
+    }
+    return data;
+}
+
+function playAudioPass(pass, buffer) {
+    if (!rectifierState.audioContext) {
+        rectifierState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    stopAudio();
+
+    const ctx = rectifierState.audioContext;
+    const PASS_DURATION = buffer.duration * 1000;
+
+    currentAudioSource = ctx.createBufferSource();
+    currentAudioSource.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = pass.filter;
+    
+    if (pass.freq !== undefined) filter.frequency.value = pass.freq;
+    if (pass.q !== undefined) filter.Q.value = pass.q;
+    if (pass.gain !== undefined) filter.gain.value = pass.gain;
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.7;
+
+    currentAudioSource.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    currentAudioSource.start(0);
+    rectifierState.startTime = performance.now();
+    isAudioPlaying = true;
+    updatePassUI();
+
+    setTimeout(() => {
+        if (isAudioPlaying && rectifierState.currentPass === pass.id) {
+            stopAudio();
+        }
+    }, PASS_DURATION + 100);
+
+    if (playBtn.style.display !== 'none') {
+        playBtn.textContent = '■ STOP';
+    }
+}
+
+function stopAudio() {
+    if (currentAudioSource) {
+        try { currentAudioSource.stop(); } catch(e){}
+        currentAudioSource = null;
+    }
+    isAudioPlaying = false;
+    updatePassUI();
+    
+    if (playBtn.style.display !== 'none') {
+        playBtn.textContent = '♪ PLAY';
+    }
+}
+
+function playLoadedAudio() {
+    if (!rectifierState.audioBuffer) return;
+    
+    if (rectifierState.audioContext && rectifierState.audioContext.state === 'suspended') {
+        rectifierState.audioContext.resume();
+    }
+
+    if (isAudioPlaying) {
+        stopAudio();
+        return;
+    }
+
+    const ctx = rectifierState.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+    rectifierState.audioContext = ctx;
+    
+    stopAudio();
+
+    currentAudioSource = ctx.createBufferSource();
+    currentAudioSource.buffer = rectifierState.audioBuffer;
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.8;
+
+    currentAudioSource.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    currentAudioSource.start(0);
+    isAudioPlaying = true;
+    updatePassUI();
+}
+
+function logTileData(pass, index, value, timestamp) {
+    logEntries.push({
+        pass: pass.id,
+        tileIndex: index,
+        tileCol: index % COLS,
+        tileRow: Math.floor(index / COLS),
+        timestamp: timestamp.toFixed(3),
+        hex: value.toString(16).toUpperCase().padStart(2, '0'),
+        decimal: value,
+        binary: value.toString(2).padStart(8, '0')
+    });
+}
+
+async function runPassSequence(pass) {
+    return new Promise((resolve) => {
+        const passData = getAudioDataForPass(pass, rectifierState.audioBuffer);
+        rectifierState.passHistory[pass.id - 1] = passData;
+        
+        playAudioPass(pass, rectifierState.audioBuffer);
+        
+        rectifierState.fillProgress = 0;
+        const startTime = performance.now();
+
+        function step() {
+            if (!rectifierState.isProcessing) {
+                stopAudio();
+                resolve();
+                return;
+            }
+
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const targetIndex = Math.min(MATRIX_SIZE, Math.floor(elapsed / TILE_DELAY_MS) + 1);
+
+            const progress = Math.min(100, (rectifierState.fillProgress / MATRIX_SIZE) * 100);
+            document.getElementById('progressBarEl').style.width = progress + '%';
+
+            if (targetIndex > rectifierState.fillProgress) {
+                for (let i = rectifierState.fillProgress; i < targetIndex && i < MATRIX_SIZE; i++) {
+                    const val = passData[i];
+                    rectifierState.matrixData[i] = val;
+                    drawTile(i, val);
+                    logTileData(pass, i, val, now);
+                }
+                rectifierState.fillProgress = targetIndex;
+            }
+
+            if (rectifierState.fillProgress < MATRIX_SIZE) {
+                animationFrameId = setTimeout(step, TILE_DELAY_MS);
+            } else {
+                document.getElementById('progressBarEl').style.width = '100%';
+                resolve();
+            }
+        }
+        
+        step();
+    });
+}
+
+async function startProcess() {
+    if (!rectifierState.audioBuffer) return;
+    
+    if (rectifierState.audioContext && rectifierState.audioContext.state === 'suspended') {
+        await rectifierState.audioContext.resume();
+    }
+
+    rectifierState.isProcessing = true;
+    rectifierState.matrixData.fill(0);
+    rectifierState.passHistory = [];
+    logEntries = [];
+    
+    startBtn.textContent = "⏳ RUNNING...";
+    startBtn.disabled = true;
+    playBtn.disabled = true;
+    imageBtn.disabled = true;
+    document.getElementById('uploadOverlayEl').style.display = 'none';
+    
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let p = 0; p < PASS_COUNT; p++) {
+        rectifierState.currentPass = p + 1;
+        updatePassUI();
+        await runPassSequence(PASS_CONFIG[p]);
+        await new Promise(r => setTimeout(r, 300));
+    }
+
+    rectifierState.isProcessing = false;
+    stopAudio();
+    startBtn.textContent = "▶ START 5-PASS";
+    startBtn.disabled = false;
+    playBtn.disabled = false;
+    imageBtn.disabled = false;
+    document.getElementById('statusEl').textContent = `COMPLETE — ${logEntries.length} TILES`;
+    
+    PASS_CONFIG.forEach((p) => {
+        const dot = document.getElementById(`passDot${p.id}`);
+        if(dot) dot.classList.add('complete');
+    });
+    
+    setTimeout(() => {
+        document.getElementById('progressBarEl').style.width = '0%';
+    }, 2000);
+}
+
+const uploadBtn = document.getElementById('uploadBtn');
+const audioInputEl = document.getElementById('audioInputEl');
+const imageInputEl = document.getElementById('imageInputEl');
+const playBtn = document.getElementById('playBtn');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const imageBtn = document.getElementById('imageBtn');
+
+uploadBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    audioInputEl.value = '';
+    audioInputEl.click();
+});
+
+uploadBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    audioInputEl.value = '';
+    audioInputEl.click();
+}, { passive: false });
+
+audioInputEl.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    document.getElementById('statusEl').textContent = "⏳ DECODING AUDIO...";
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        if (!rectifierState.audioContext) {
+            rectifierState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (rectifierState.audioContext.state === 'suspended') {
+            await rectifierState.audioContext.resume();
+        }
+        
+        rectifierState.audioBuffer = await rectifierState.audioContext.decodeAudioData(arrayBuffer);
+        
+        document.getElementById('uploadOverlayEl').style.display = 'none';
+        document.getElementById('statusEl').textContent = `READY — ${file.name.substring(0,18)}`;
+        
+        playBtn.style.display = 'flex';
+        startBtn.style.display = 'flex';
+        imageBtn.style.display = 'flex';
+        
+        ctx.fillStyle = '#020617';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+    } catch (err) {
+        document.getElementById('statusEl').textContent = "❌ ERROR DECODING AUDIO";
+        console.error(err);
+    }
+};
+
+imageBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    imageInputEl.value = '';
+    imageInputEl.click();
+});
+
+imageBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    imageInputEl.value = '';
+    imageInputEl.click();
+}, { passive: false });
+
+imageInputEl.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    document.getElementById('statusEl').textContent = "⏳ LOADING PASS 01 IMG...";
+    
+    try {
+        await loadPass01Image(file);
+        document.getElementById('statusEl').textContent = `PASS 01 IMG LOADED`;
+        imageBtn.textContent = "✓ PASS 01 READY";
+    } catch (err) {
+        document.getElementById('statusEl').textContent = "❌ ERROR LOADING IMG";
+    }
+};
+
+startBtn.onclick = startProcess;
+playBtn.onclick = playLoadedAudio;
+
+resetBtn.onclick = () => {
+    location.reload();
+};
+
+downloadBtn.onclick = () => {
+    if (logEntries.length === 0) {
+        alert("No data to export. Run the 5-pass first.");
+        return;
+    }
+    
+    const payload = {
+        metadata: {
+            timestamp: new Date().toISOString(),
+            totalEntries: logEntries.length,
+            totalTiles: MATRIX_SIZE,
+            gridDimensions: { rows: ROWS, cols: COLS },
+            passCount: PASS_COUNT,
+            hasPass01Image: rectifierState.imageData !== null
+        },
+        data: logEntries
+    };
+    
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `geoco0ode_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+window.onload = () => {
+    initPassSelector(); 
+    updatePassUI();
+    
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+};
+</script>
+</body>
+</html>
