@@ -206,8 +206,9 @@ function initPassSelector() {
         dot.textContent = String(pass.id).padStart(2, '0');
         dot.title = pass.name;
         container.appendChild(dot);
-    });
-}
+    }
+
+
 
 function updatePassUI() {
     const pass = PASS_CONFIG[rectifierState.currentPass - 1];
